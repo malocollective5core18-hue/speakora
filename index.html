@@ -214,6 +214,11 @@ button,input,select,textarea{font-family:inherit;}
 .chat-status.typing{ color:var(--violet); font-style:italic; }
 
 .messages{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:22px 6% 10px; display:flex; flex-direction:column; gap:2px; }
+.pinned-bar{ position:sticky; top:0; z-index:4; display:none; flex-direction:column; gap:4px; padding:8px 10px; margin:0 0 8px; background:color-mix(in srgb, var(--panel) 94%, transparent); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow); backdrop-filter:blur(8px); }
+.pinned-bar.show{ display:flex; }
+.pinned-heading{ font-size:11px; font-weight:700; color:var(--violet); text-transform:uppercase; letter-spacing:.5px; }
+.pinned-item{ border:0; border-left:3px solid var(--violet); background:transparent; color:var(--text-dim); text-align:left; padding:5px 8px; cursor:pointer; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pinned-item:hover{ background:var(--panel-3); color:var(--text); }
 .message-actions{ display:flex; align-items:center; gap:6px; padding:8px 14px; background:var(--panel-2); border-top:1px solid var(--border); }
 .message-actions.hidden{ display:none; }
 .message-actions span{ flex:1; font-size:12px; color:var(--text-dim); }
@@ -1166,6 +1171,10 @@ async function loadMessages(conversationId){
   box.innerHTML = '';
   messageCache.clear();
   clearMessageSelection();
+  const pinnedBar = document.createElement('div');
+  pinnedBar.className = 'pinned-bar';
+  pinnedBar.id = 'pinnedMessagesBar';
+  box.appendChild(pinnedBar);
   const chip = document.createElement('div');
   chip.className = 'date-chip';
   chip.textContent = 'Today';
@@ -1175,6 +1184,7 @@ async function loadMessages(conversationId){
     renderedMessageIds.add(m.id);
     box.appendChild(renderMessageRow(m));
   });
+  renderPinnedMessages(visibleMessages);
   scrollBottom();
 
   // mark their unread messages as read
@@ -1183,6 +1193,25 @@ async function loadMessages(conversationId){
     sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
   }
 }
+
+function renderPinnedMessages(messages){
+  const bar = $('#pinnedMessagesBar');
+  if(!bar) return;
+  const pinned = (messages || []).filter(m=>m.pinned_at && !m.deleted_at);
+  bar.innerHTML = pinned.length
+    ? `<div class="pinned-heading"><i class="fa-solid fa-thumbtack"></i> Pinned messages</div>`
+      + pinned.map(m=>`<button type="button" class="pinned-item" data-pinned-id="${m.id}">${escapeHtml(m.body)}</button>`).join('')
+    : '';
+  bar.classList.toggle('show', pinned.length > 0);
+  bar.querySelectorAll('.pinned-item').forEach(item=>item.addEventListener('click', ()=>{
+    const row = $(`.msg-row[data-id="${item.dataset.pinnedId}"]`);
+    if(!row) return;
+    row.scrollIntoView({ behavior:'smooth', block:'center' });
+    row.classList.add('selected');
+    setTimeout(()=>row.classList.remove('selected'), 1400);
+  }));
+}
+function refreshPinnedMessagesBar(){ renderPinnedMessages([...messageCache.values()]); }
 
 function renderMessageRow(m){
   messageCache.set(m.id, m);
@@ -1218,9 +1247,10 @@ async function editSelectedMessage(){
   if(body === null || !body.trim() || body.trim() === message.body) return;
   const { data, error } = await sb.rpc('edit_message', { p_message_id:id, p_body:body.trim() });
   if(error){ showToast('Could not edit message.'); return; }
-  messageCache.set(id, data || { ...message, body:body.trim(), edited_at:new Date().toISOString() });
+  messageCache.set(id, Array.isArray(data) ? data[0] : (data || { ...message, body:body.trim(), edited_at:new Date().toISOString() }));
   const row = $(`.msg-row[data-id="${id}"]`);
   if(row){ row.querySelector('.msg-text').textContent = body.trim(); row.classList.remove('selected'); }
+  refreshPinnedMessagesBar();
   clearMessageSelection();
 }
 async function deleteSelectedMessages(){
@@ -1247,6 +1277,7 @@ async function deleteSelectedMessages(){
     selectedMessageIds.delete(id);
   }
   clearMessageSelection();
+  refreshPinnedMessagesBar();
   loadConversations();
 }
 async function pinSelectedMessage(){
@@ -1254,9 +1285,10 @@ async function pinSelectedMessage(){
   const { data, error } = await sb.rpc('pin_message', { p_message_id:id });
   if(error){ showToast('Could not pin message.'); return; }
   const message = messageCache.get(id) || {};
-  const updated = { ...message, ...(data || {}) };
+  const updated = { ...message, ...(Array.isArray(data) ? data[0] : data) };
   messageCache.set(id, updated);
   const row = $(`.msg-row[data-id="${id}"]`); if(row) row.classList.toggle('pinned', !!updated.pinned_at);
+  refreshPinnedMessagesBar();
   clearMessageSelection(); showToast(updated.pinned_at ? 'Message pinned.' : 'Message unpinned.');
 }
 async function forwardSelectedMessage(){
@@ -1310,6 +1342,7 @@ function subscribeToMessages(conversationId){
         if(time && m.edited_at && !time.querySelector('.msg-edited')) time.insertAdjacentHTML('beforeend','<span class="msg-edited">edited</span>');
         row.classList.toggle('pinned', !!m.pinned_at);
         row.classList.toggle('deleted', !!m.deleted_at);
+        refreshPinnedMessagesBar();
       }
     })
     .on('postgres_changes', { event:'DELETE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
