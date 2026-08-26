@@ -151,6 +151,19 @@ button,input,select,textarea{font-family:inherit;}
   box-shadow:0 10px 24px rgba(74,63,180,.45);
 }
 #newChatBtn:hover{ background:var(--grad); color:#fff; transform:translateY(-2px); }
+.app.show-chat #newChatBtn{ bottom:88px; }
+.more-wrap{ position:relative; }
+.more-menu{
+  position:absolute; top:44px; right:0; z-index:50; min-width:190px; padding:6px;
+  background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-md);
+  box-shadow:var(--shadow); display:none;
+}
+.more-menu.show{ display:block; }
+.more-menu button{
+  display:flex; align-items:center; gap:10px; width:100%; border:0; border-radius:8px;
+  padding:10px 11px; background:transparent; color:var(--text); text-align:left; font-size:13px; cursor:pointer;
+}
+.more-menu button:hover{ background:var(--panel-3); }
 .sb-search{ padding:2px 16px 14px; }
 .search-box{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid transparent; border-radius:999px; padding:9px 14px; transition:.15s ease; }
 .search-box:focus-within{ border-color:var(--violet); background:var(--panel); }
@@ -185,6 +198,14 @@ button,input,select,textarea{font-family:inherit;}
   background: radial-gradient(circle at 15% 0%, rgba(226,58,156,.05), transparent 40%), radial-gradient(circle at 85% 100%, rgba(74,99,240,.06), transparent 40%), var(--bg); }
 .chat-header{ display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--panel); }
 .back-btn{ display:none; }
+.chat-notify-btn{ position:relative; width:40px; height:40px; border:0; border-radius:50%; background:var(--panel-2); color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; }
+.chat-notify-btn:hover{ background:var(--panel-3); color:var(--text); }
+.notify-count{ position:absolute; top:-4px; right:-4px; min-width:19px; height:19px; padding:0 5px; border-radius:999px; background:var(--grad); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; border:2px solid var(--panel); }
+.notify-count.hidden{ display:none; }
+.chat-notify-btn.notify-other{ animation: notifyOther .9s ease-in-out 3; color:#FF9B45; background:linear-gradient(135deg, #FF8A3D, var(--violet), var(--blue)); }
+.chat-notify-btn.notify-same{ animation: notifySame .6s ease-in-out 2; color:#BFE9FF; background:linear-gradient(135deg, #3B82F6, var(--violet), var(--magenta)); }
+@keyframes notifyOther{ 0%,100%{ transform:rotate(0) scale(1); } 25%{ transform:rotate(-18deg) scale(1.08); } 50%{ transform:rotate(18deg) scale(1.08); } 75%{ transform:rotate(-12deg) scale(1.05); } }
+@keyframes notifySame{ 0%,100%{ transform:translateY(0) scale(1); } 35%{ transform:translateY(-6px) scale(1.12); } 70%{ transform:translateY(2px) scale(.96); } }
 .chat-id{ display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
 .chat-name{ font-family:var(--font-display); font-weight:700; font-size:15px; }
 .chat-status{ font-size:12px; color:var(--text-faint); display:flex; align-items:center; gap:5px; }
@@ -250,6 +271,16 @@ button,input,select,textarea{font-family:inherit;}
 .result-card button{ background:var(--grad); border:none; color:#fff; border-radius:999px; padding:8px 16px; font-weight:700; font-size:12.5px; cursor:pointer; flex:none; }
 .discover-empty{ text-align:center; color:var(--text-faint); font-size:13px; padding:16px 0; }
 .close-modal{ position:absolute; top:16px; right:16px; }
+.profile-modal{ position:relative; }
+.profile-avatar-large{ width:76px; height:76px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-size:25px; font-weight:700; background:var(--grad); }
+.profile-readonly{ opacity:.7; cursor:not-allowed; }
+.share-modal{ position:relative; }
+.share-link-box{ display:flex; gap:8px; margin-top:16px; }
+.share-link-box input{ flex:1; min-width:0; background:var(--input-bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; color:var(--text-dim); font-size:12px; }
+.share-actions{ display:flex; gap:8px; margin-top:12px; }
+.share-actions button{ flex:1; border:0; border-radius:var(--radius-sm); padding:11px 10px; font-weight:700; cursor:pointer; }
+.share-primary{ background:var(--grad); color:#fff; }
+.share-secondary{ background:var(--panel-2); color:var(--text); }
 
 /* ============ TOAST ============ */
 #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
@@ -264,6 +295,7 @@ button,input,select,textarea{font-family:inherit;}
   .back-btn{ display:flex; }
   .bubble-wrap{ max-width:82%; }
   #newChatBtn{ right:18px; bottom:44px; }
+  .app.show-chat #newChatBtn{ bottom:102px; }
 }
 </style>
 </head>
@@ -382,6 +414,13 @@ button,input,select,textarea{font-family:inherit;}
       <div class="sb-actions">
         <button class="icon-btn" id="newChatBtn" title="Message someone by phone number"><i class="fa-solid fa-comment-medical"></i></button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+        <div class="more-wrap">
+          <button class="icon-btn" id="moreBtn" title="More options" aria-label="More options" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+          <div class="more-menu" id="moreMenu">
+            <button type="button" id="shareContactBtn"><i class="fa-solid fa-link"></i> Share my contact link</button>
+            <button type="button" id="profileBtn"><i class="fa-solid fa-user"></i> My Speakora profile</button>
+          </div>
+        </div>
         <button class="icon-btn" id="logoutBtn" title="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
       </div>
     </div>
@@ -421,6 +460,9 @@ button,input,select,textarea{font-family:inherit;}
             <div class="chat-status" id="chatStatus"></div>
           </div>
         </div>
+        <button class="chat-notify-btn" id="chatNotifyBtn" title="Unread messages" aria-label="Unread messages" aria-live="polite">
+          <i class="fa-regular fa-bell"></i><span class="notify-count hidden" id="notifyCount">0</span>
+        </button>
       </div>
 
       <div class="messages scroll" id="messages"></div>
@@ -448,6 +490,35 @@ button,input,select,textarea{font-family:inherit;}
       <button id="discoverBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
     </div>
     <div class="discover-result" id="discoverResult"></div>
+  </div>
+</div>
+
+<div class="modal-scrim" id="profileScrim">
+  <div class="discover-modal profile-modal">
+    <button class="icon-btn close-modal" id="closeProfile"><i class="fa-solid fa-xmark"></i></button>
+    <div class="profile-avatar-large" id="profileAvatarLarge">?</div>
+    <h3>My Speakora profile</h3>
+    <p>Edit the details other people see when they message you.</p>
+    <div id="profileMsg" class="auth-msg"></div>
+    <form id="profileForm">
+      <div class="field"><label>Name</label><input type="text" id="profileName" required></div>
+      <div class="field"><label>Phone number</label><input type="tel" id="profilePhone" required></div>
+      <div class="field"><label>Email</label><input type="email" id="profileEmail" class="profile-readonly" readonly></div>
+      <button type="submit" class="primary-btn" id="profileSaveBtn"><i class="fa-solid fa-check"></i> Save changes</button>
+    </form>
+  </div>
+</div>
+
+<div class="modal-scrim" id="shareScrim">
+  <div class="discover-modal share-modal">
+    <button class="icon-btn close-modal" id="closeShare"><i class="fa-solid fa-xmark"></i></button>
+    <h3>Share my Speakora contact</h3>
+    <p>Choose Share to send it through your phone’s sharing apps, or copy the link.</p>
+    <div class="share-link-box"><input id="shareLinkInput" readonly aria-label="Contact link"></div>
+    <div class="share-actions">
+      <button type="button" class="share-primary" id="nativeShareBtn"><i class="fa-solid fa-share-nodes"></i> Share</button>
+      <button type="button" class="share-secondary" id="copyShareBtn"><i class="fa-regular fa-copy"></i> Copy link</button>
+    </div>
   </div>
 </div>
 
@@ -610,6 +681,8 @@ let presenceChannel = null;
 let onlinePeers = {};
 let typingTimeout = null;
 let renderedMessageIds = new Set();
+let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
+let pendingContactKey = new URLSearchParams(window.location.search).get('key');
 
 function showToast(msg){
   const t = $('#toast');
@@ -617,6 +690,23 @@ function showToast(msg){
   t.classList.add('show');
   clearTimeout(t._timer);
   t._timer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+function updateNotificationBadge(){
+  const count = conversations.reduce((sum, convo)=> sum + (convo[myUnreadField(convo)] || 0), 0);
+  const badge = $('#notifyCount');
+  const button = $('#chatNotifyBtn');
+  if(!badge || !button) return;
+  badge.textContent = count > 99 ? '99+' : String(count);
+  badge.classList.toggle('hidden', count === 0);
+  button.setAttribute('aria-label', count ? `${count} unread message${count === 1 ? '' : 's'}` : 'No unread messages');
+}
+function animateNotification(type){
+  const button = $('#chatNotifyBtn');
+  if(!button) return;
+  button.classList.remove('notify-other', 'notify-same');
+  void button.offsetWidth;
+  button.classList.add(type === 'same' ? 'notify-same' : 'notify-other');
+  setTimeout(()=> button.classList.remove('notify-other', 'notify-same'), type === 'same' ? 1300 : 2900);
 }
 function initials(name){
   if(!name) return '?';
@@ -834,6 +924,19 @@ async function enterApp(){
   await loadConversations();
   subscribeToConversations();
   subscribeToPresence();
+  await handleContactLink();
+}
+
+async function handleContactLink(){
+  if(!pendingContactLink) return;
+  const contactId = pendingContactLink;
+  const expectedKey = btoa(contactId);
+  pendingContactLink = null;
+  if(pendingContactKey !== expectedKey || contactId === me.id) return;
+  pendingContactKey = null;
+  const { data, error } = await sb.from('profiles').select('*').eq('id', contactId).maybeSingle();
+  if(error || !data){ showToast('That contact link is no longer available.'); return; }
+  await startConversationWith(data);
 }
 
 /* ============ CONVERSATIONS ============ */
@@ -846,6 +949,7 @@ async function loadConversations(){
 
   if(error){ showToast('Could not load conversations.'); return; }
   conversations = data || [];
+  updateNotificationBadge();
   renderConvoList($('#searchInput').value);
 }
 
@@ -905,6 +1009,9 @@ function subscribeToConversations(){
     .on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, payload=>{
       const row = payload.new || payload.old;
       if(row && (row.user_a === me.id || row.user_b === me.id)){
+        if(payload.event === 'UPDATE' && row.last_message_sender_id && row.last_message_sender_id !== me.id){
+          animateNotification(activeConvo && row.id === activeConvo.id ? 'same' : 'other');
+        }
         loadConversations();
         if(activeConvo && row.id === activeConvo.id){
           activeConvo = { ...activeConvo, ...payload.new };
@@ -928,6 +1035,11 @@ function subscribeToPresence(){
 
 /* ============ ACTIVE CONVERSATION ============ */
 async function openConversation(convo){
+  // Add one browser-history step when entering a chat so Back returns to the
+  // conversation list without leaving the app.
+  if(!app.classList.contains('show-chat')){
+    history.pushState({ ...(history.state || {}), speakoraChat: convo.id }, '', location.href);
+  }
   activeConvo = convo;
   renderedMessageIds = new Set();
   $('#emptyState').style.display = 'none';
@@ -951,6 +1063,16 @@ async function openConversation(convo){
   await loadMessages(convo.id);
   subscribeToMessages(convo.id);
 }
+
+function closeChatView(){
+  app.classList.remove('show-chat');
+  $('#chatContent').style.display = 'none';
+  $('#emptyState').style.display = 'flex';
+}
+
+window.addEventListener('popstate', ()=>{
+  if(!history.state || !history.state.speakoraChat) closeChatView();
+});
 
 function updateChatHeaderStatus(){
   if(!activeConvo) return;
@@ -1021,6 +1143,7 @@ function subscribeToMessages(conversationId){
       $('#messages').appendChild(renderMessageRow(m));
       scrollBottom();
       if(m.sender_id !== me.id){
+        animateNotification('same');
         hideTyping();
         sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
       }
@@ -1130,6 +1253,10 @@ $('#newChatBtn').addEventListener('click', ()=>{
   $('#discoverResult').innerHTML = '';
   $('#discoverInput').focus();
 });
+$('#chatNotifyBtn').addEventListener('click', ()=>{
+  const count = Number($('#notifyCount').textContent.replace('+','')) || 0;
+  showToast(count ? `${count} unread message${count === 1 ? '' : 's'}` : 'No unread messages');
+});
 $('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
 $('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
 
@@ -1179,6 +1306,101 @@ $('#discoverInput').addEventListener('input', ()=>{
   discoverTimer = setTimeout(runDiscover, 350);
 });
 
+/* ============ MORE MENU / PROFILE ============ */
+const moreBtn = $('#moreBtn');
+const moreMenu = $('#moreMenu');
+moreBtn.addEventListener('click', e=>{
+  e.stopPropagation();
+  const open = moreMenu.classList.toggle('show');
+  moreBtn.setAttribute('aria-expanded', String(open));
+});
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.more-wrap')){
+    moreMenu.classList.remove('show');
+    moreBtn.setAttribute('aria-expanded', 'false');
+  }
+});
+
+$('#shareContactBtn').addEventListener('click', async ()=>{
+  moreMenu.classList.remove('show');
+  moreBtn.setAttribute('aria-expanded', 'false');
+  // The key prevents accidental edits to the contact id in this prototype;
+  // it is an invite token, not a substitute for authentication.
+  const link = `${location.href.split('?')[0]}?contact=${encodeURIComponent(myProfile.id)}&key=${encodeURIComponent(btoa(myProfile.id))}`;
+  $('#shareLinkInput').value = link;
+  $('#nativeShareBtn').style.display = navigator.share ? 'block' : 'none';
+  $('#shareScrim').classList.add('show');
+});
+$('#closeShare').addEventListener('click', ()=> $('#shareScrim').classList.remove('show'));
+$('#shareScrim').addEventListener('click', e=>{ if(e.target.id === 'shareScrim') $('#shareScrim').classList.remove('show'); });
+$('#nativeShareBtn').addEventListener('click', async ()=>{
+  const link = $('#shareLinkInput').value;
+  if(!navigator.share) return;
+  try{
+    await navigator.share({ title:'Join me on Speakora', text:'Message me on Speakora:', url:link });
+    $('#shareScrim').classList.remove('show');
+  }catch(e){
+    if(e.name !== 'AbortError') showToast('Could not open the sharing menu.');
+  }
+});
+$('#copyShareBtn').addEventListener('click', async ()=>{
+  const link = $('#shareLinkInput').value;
+  try{
+    await navigator.clipboard.writeText(link);
+    showToast('Contact link copied to clipboard.');
+    $('#shareScrim').classList.remove('show');
+  }catch(e){
+    $('#shareLinkInput').focus();
+    $('#shareLinkInput').select();
+    showToast('Select and copy the contact link.');
+  }
+});
+
+function openProfileModal(){
+  $('#profileName').value = myProfile.display_name || '';
+  $('#profilePhone').value = myProfile.phone || '';
+  $('#profileEmail').value = myProfile.email || me.email || '';
+  $('#profileAvatarLarge').style.background = avatarColor(myProfile.id);
+  $('#profileAvatarLarge').textContent = initials(myProfile.display_name || myProfile.email);
+  $('#profileMsg').className = 'auth-msg';
+  $('#profileScrim').classList.add('show');
+}
+$('#profileBtn').addEventListener('click', ()=>{ moreMenu.classList.remove('show'); moreBtn.setAttribute('aria-expanded','false'); openProfileModal(); });
+$('#closeProfile').addEventListener('click', ()=> $('#profileScrim').classList.remove('show'));
+$('#profileScrim').addEventListener('click', e=>{ if(e.target.id === 'profileScrim') $('#profileScrim').classList.remove('show'); });
+$('#profileName').addEventListener('input', e=>{ $('#profileAvatarLarge').textContent = initials(e.target.value) || '?'; });
+$('#profileForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const name = $('#profileName').value.trim();
+  const phone = normalizePhone($('#profilePhone').value);
+  const msg = $('#profileMsg');
+  if(!name || !/^\+[0-9]{5,15}$/.test(phone)){
+    msg.textContent = 'Enter a name and a valid phone number with country code.';
+    msg.className = 'auth-msg show error';
+    return;
+  }
+  const btn = $('#profileSaveBtn');
+  btn.disabled = true;
+  const country = countryFromPhone(phone);
+  const { data, error } = await sb.from('profiles').update({
+    display_name:name, phone, dial_code:country ? country.dial : null,
+    country_code:country ? country.iso : null, country_name:country ? country.name : null
+  }).eq('id', me.id).select().single();
+  btn.disabled = false;
+  if(error){
+    msg.textContent = error.code === '23505' ? 'That phone number is already registered.' : error.message;
+    msg.className = 'auth-msg show error';
+    return;
+  }
+  myProfile = data;
+  $('#meAvatar').textContent = initials(myProfile.display_name || myProfile.email);
+  $('#meName').textContent = myProfile.display_name || myProfile.email;
+  const updatedCountry = countryFromPhone(myProfile.phone);
+  $('#meSub').textContent = updatedCountry ? `${myProfile.phone} · ${updatedCountry.name}` : myProfile.phone;
+  $('#profileScrim').classList.remove('show');
+  showToast('Profile updated.');
+});
+
 async function startConversationWith(otherProfile){
   const a = me.id < otherProfile.id ? me.id : otherProfile.id;
   const b = me.id < otherProfile.id ? otherProfile.id : me.id;
@@ -1212,7 +1434,10 @@ async function startConversationWith(otherProfile){
 }
 
 /* ============ BACK / THEME / LOGOUT ============ */
-$('#backBtn').addEventListener('click', ()=> app.classList.remove('show-chat'));
+$('#backBtn').addEventListener('click', ()=>{
+  if(history.state && history.state.speakoraChat) history.back();
+  else closeChatView();
+});
 $('#themeBtn').addEventListener('click', ()=>{
   const cur = document.documentElement.getAttribute('data-theme');
   applyTheme(cur==='dark' ? 'light' : 'dark');
