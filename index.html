@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Speakora — Talk to anyone, in any language</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --magenta:#E23A9C; --violet:#7C4FEA; --blue:#4A63F0;
+  --grad: linear-gradient(135deg, var(--magenta), var(--violet) 55%, var(--blue));
+  --grad-soft: linear-gradient(135deg, rgba(226,58,156,.18), rgba(124,79,234,.18) 55%, rgba(74,99,240,.18));
+  --online:#39D98A; --danger:#F1555D;
+  --radius-lg:18px; --radius-md:12px; --radius-sm:8px;
+  --font-display:'Sora',sans-serif; --font-body:'Inter',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+html[data-theme="dark"]{
+  --bg:#0E0817; --panel:#170F26; --panel-2:#1D1430; --panel-3:#241A38; --border:#2B2040;
+  --text:#F4EEFC; --text-dim:#AB9AC6; --text-faint:#6E5D8A;
+  --bubble-recv:#221933; --bubble-recv-border:#2E2344;
+  --shadow: 0 12px 32px rgba(0,0,0,.35); --input-bg:#1B1329; --scrim: rgba(14,8,23,.72);
+}
+html[data-theme="light"]{
+  --bg:#FAF7FD; --panel:#FFFFFF; --panel-2:#F4EFFB; --panel-3:#EDE5F9; --border:#E4DAF3;
+  --text:#241733; --text-dim:#6C5C87; --text-faint:#9C8FB8;
+  --bubble-recv:#F1EAFB; --bubble-recv-border:#E4D6F7;
+  --shadow: 0 12px 28px rgba(124,79,234,.12); --input-bg:#F4EFFB; --scrim: rgba(36,23,51,.5);
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{margin:0; font-family:var(--font-body); background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; overflow:hidden;}
+button,input,select,textarea{font-family:inherit;}
+::selection{background:var(--violet); color:#fff;}
+.scroll::-webkit-scrollbar{width:6px;}
+.scroll::-webkit-scrollbar-thumb{background:var(--border); border-radius:10px;}
+.scroll::-webkit-scrollbar-track{background:transparent;}
+.hidden{ display:none !important; }
+.logo-frame {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  display: block;
+  border-radius: 50%;
+  overflow: hidden;
+}
+.logomark {
+  width: 100%;
+  height: 100%;
+  background: url("SKT/splogo.jpg") center / 179% no-repeat;
+}
+
+/* ============ SETUP GATE ============ */
+#setupGate{
+  position:fixed; inset:0; background:var(--bg); z-index:999; display:flex; align-items:center; justify-content:center; padding:24px;
+}
+.setup-card{
+  max-width:520px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:32px; box-shadow:var(--shadow);
+}
+.setup-card h1{ font-family:var(--font-display); font-size:20px; margin:16px 0 6px; }
+.setup-card p{ color:var(--text-dim); font-size:14px; line-height:1.6; }
+.setup-card ol{ color:var(--text-dim); font-size:13.5px; line-height:1.9; padding-left:20px; }
+.setup-card code{ background:var(--panel-2); padding:2px 6px; border-radius:5px; font-family:var(--font-mono); font-size:12.5px; color:var(--violet); }
+
+/* ============ AUTH SCREEN ============ */
+#authScreen{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:20px;
+  background:
+    radial-gradient(circle at 15% 10%, rgba(226,58,156,.10), transparent 40%),
+    radial-gradient(circle at 85% 90%, rgba(74,99,240,.12), transparent 40%),
+    var(--bg);
+}
+.auth-card{
+  width:100%; max-width:400px; background:var(--panel); border:1px solid var(--border);
+  border-radius:var(--radius-lg); padding:36px 32px; box-shadow:var(--shadow);
+}
+.auth-brand{ display:flex; align-items:center; gap:10px; justify-content:center; margin-bottom:8px; }
+.auth-brand span{ font-family:var(--font-display); font-weight:800; font-size:22px; background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.auth-tagline{ text-align:center; color:var(--text-faint); font-size:13px; margin-bottom:26px; }
+.auth-tabs{ display:flex; background:var(--panel-2); border-radius:999px; padding:4px; margin-bottom:24px; }
+.auth-tabs button{
+  flex:1; border:none; background:transparent; padding:9px 0; border-radius:999px; font-weight:600; font-size:13.5px;
+  color:var(--text-dim); cursor:pointer; transition:.15s ease;
+}
+.auth-tabs button.active{ background:var(--grad); color:#fff; }
+.field{ margin-bottom:16px; }
+.field label{ display:block; font-size:12.5px; font-weight:600; color:var(--text-dim); margin-bottom:7px; }
+.field input, .field select{
+  width:100%; background:var(--input-bg); border:1px solid var(--border); border-radius:var(--radius-sm);
+  padding:12px 14px; color:var(--text); font-size:14px; outline:none; transition:.15s ease;
+}
+.field input:focus, .field select:focus{ border-color:var(--violet); }
+.password-wrap{ position:relative; }
+.password-wrap input{ padding-right:42px; }
+.password-toggle{
+  position:absolute; top:50%; right:10px; transform:translateY(-50%); width:30px; height:30px;
+  border:0; border-radius:50%; background:transparent; color:var(--text-faint); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; padding:0;
+}
+.password-toggle:hover{ background:var(--panel-3); color:var(--text); }
+.password-toggle:focus-visible{ outline:2px solid var(--violet); outline-offset:1px; }
+.field-row{ display:flex; gap:10px; }
+.field-row .field{ flex:1; }
+.field-row .field.dial{ flex:0 0 150px; }
+.primary-btn{
+  width:100%; border:none; background:var(--grad); color:#fff; font-weight:700; font-size:14.5px;
+  padding:13px 0; border-radius:var(--radius-sm); cursor:pointer; margin-top:6px; box-shadow:0 8px 20px rgba(124,79,234,.35);
+  transition:.15s ease; display:flex; align-items:center; justify-content:center; gap:8px;
+}
+.primary-btn:hover{ transform:translateY(-1px); }
+.primary-btn:disabled{ opacity:.55; cursor:default; transform:none; }
+.auth-msg{ font-size:12.5px; padding:10px 12px; border-radius:8px; margin-bottom:14px; display:none; }
+.auth-msg.show{ display:block; }
+.auth-msg.error{ background:rgba(241,85,93,.12); color:#FF8A90; border:1px solid rgba(241,85,93,.3); }
+.auth-msg.info{ background:var(--grad-soft); color:var(--violet); border:1px solid rgba(124,79,234,.3); }
+.auth-hint{ text-align:center; font-size:12px; color:var(--text-faint); margin-top:18px; }
+
+/* ============ ONBOARDING ============ */
+#onboardingScreen{
+  position:fixed; inset:0; display:flex; align-items:center; justify-content:center; padding:20px;
+  background: var(--bg);
+}
+.onboard-card{ width:100%; max-width:440px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg); padding:36px 32px; box-shadow:var(--shadow); }
+.onboard-step{ font-family:var(--font-mono); font-size:11px; letter-spacing:1px; color:var(--violet); text-transform:uppercase; margin-bottom:8px; }
+.onboard-card h1{ font-family:var(--font-display); font-size:21px; margin:0 0 6px; }
+.onboard-card > p{ color:var(--text-dim); font-size:13.5px; margin:0 0 24px; line-height:1.6; }
+.avatar-preview{
+  width:64px; height:64px; border-radius:50%; margin:0 auto 20px; display:flex; align-items:center; justify-content:center;
+  font-family:var(--font-display); font-weight:700; font-size:22px; color:#fff; background:var(--grad);
+}
+
+/* ============ APP SHELL ============ */
+.app{ display:grid; grid-template-columns: 380px 1fr; height:100vh; background:var(--bg); }
+.sidebar{ background:var(--panel); border-right:1px solid var(--border); display:flex; flex-direction:column; min-width:0; }
+.sb-top{ display:flex; align-items:center; justify-content:space-between; padding:18px 18px 14px; }
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand-name{ font-family:var(--font-display); font-weight:800; font-size:19px; background:var(--grad); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.sb-actions{ display:flex; gap:4px; }
+.icon-btn{
+  width:38px; height:38px; border-radius:50%; border:none; background:transparent; color:var(--text-dim); font-size:15px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; transition:.15s ease; position:relative;
+}
+.icon-btn:hover{ background:var(--panel-3); color:var(--text); }
+#newChatBtn{
+  position:fixed; right:24px; bottom:24px; z-index:30; width:56px; height:56px;
+  background:var(--grad); color:#fff; font-size:18px;
+  box-shadow:0 10px 24px rgba(74,63,180,.45);
+}
+#newChatBtn:hover{ background:var(--grad); color:#fff; transform:translateY(-2px); }
+.sb-search{ padding:2px 16px 14px; }
+.search-box{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid transparent; border-radius:999px; padding:9px 14px; transition:.15s ease; }
+.search-box:focus-within{ border-color:var(--violet); background:var(--panel); }
+.search-box i{ color:var(--text-faint); font-size:13px; }
+.search-box input{ border:none; outline:none; background:transparent; color:var(--text); font-size:14px; width:100%; }
+.search-box input::placeholder{ color:var(--text-faint); }
+
+.convo-list{ flex:1; overflow-y:auto; padding:4px 8px 8px; }
+.empty-list{ text-align:center; color:var(--text-faint); font-size:13px; padding:40px 20px; line-height:1.7; }
+.convo{ display:flex; align-items:center; gap:12px; padding:10px 10px; border-radius:var(--radius-md); cursor:pointer; border:1px solid transparent; transition:.15s ease; }
+.convo:hover{ background:var(--panel-2); }
+.convo.active{ background:var(--grad-soft); border-color:rgba(124,79,234,.35); }
+.avatar{ width:46px; height:46px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:15px; color:#fff; position:relative; }
+.avatar.sm{ width:36px; height:36px; font-size:13px; }
+.avatar .dot{ position:absolute; right:-1px; bottom:-1px; width:12px; height:12px; border-radius:50%; background:var(--online); border:2.5px solid var(--panel); }
+.convo-body{ min-width:0; flex:1; }
+.convo-top{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.convo-name{ font-weight:600; font-size:14.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.convo-time{ font-size:11px; color:var(--text-faint); font-family:var(--font-mono); flex:none; }
+.convo-bottom{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:2px; }
+.convo-preview{ font-size:13px; color:var(--text-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.convo-meta{ display:flex; align-items:center; gap:6px; flex:none; }
+.lang-pill{ font-family:var(--font-mono); font-size:10px; font-weight:600; color:var(--violet); background:var(--grad-soft); padding:2px 6px; border-radius:6px; }
+.unread{ min-width:19px; height:19px; padding:0 5px; border-radius:999px; background:var(--grad); color:#fff; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+
+.sb-footer{ display:flex; align-items:center; gap:10px; padding:14px 16px; border-top:1px solid var(--border); }
+.me-name{ font-weight:600; font-size:13.5px; }
+.me-sub{ font-size:11.5px; color:var(--text-faint); }
+
+/* ============ CHAT PANEL ============ */
+.chat{ display:flex; flex-direction:column; min-width:0; position:relative;
+  background: radial-gradient(circle at 15% 0%, rgba(226,58,156,.05), transparent 40%), radial-gradient(circle at 85% 100%, rgba(74,99,240,.06), transparent 40%), var(--bg); }
+.chat-header{ display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--panel); }
+.back-btn{ display:none; }
+.chat-id{ display:flex; align-items:center; gap:12px; flex:1; min-width:0; }
+.chat-name{ font-family:var(--font-display); font-weight:700; font-size:15px; }
+.chat-status{ font-size:12px; color:var(--text-faint); display:flex; align-items:center; gap:5px; }
+.chat-status .dot-online{ width:7px; height:7px; border-radius:50%; background:var(--online); }
+.chat-status.typing{ color:var(--violet); font-style:italic; }
+
+.messages{ flex:1; overflow-y:auto; padding:22px 6% 10px; display:flex; flex-direction:column; gap:2px; }
+.date-chip{ align-self:center; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); background:var(--panel-2); padding:5px 12px; border-radius:999px; margin:14px 0 18px; }
+.msg-row{ display:flex; margin:3px 0; max-width:100%; }
+.msg-row.me{ justify-content:flex-end; }
+.msg-row.them{ justify-content:flex-start; }
+.bubble-wrap{ max-width:62%; position:relative; }
+.bubble{ padding:10px 14px 8px; border-radius:var(--radius-lg); position:relative; font-size:14.5px; line-height:1.45; word-wrap:break-word; box-shadow:var(--shadow); animation: pop .18s ease; }
+@keyframes pop{ from{ transform:scale(.94); opacity:0;} to{ transform:scale(1); opacity:1; } }
+.msg-row.me .bubble{ background:var(--grad); color:#fff; border-bottom-right-radius:4px; }
+.msg-row.them .bubble{ background:var(--bubble-recv); border:1px solid var(--bubble-recv-border); color:var(--text); border-bottom-left-radius:4px; }
+.msg-meta{ display:flex; align-items:center; gap:5px; justify-content:flex-end; margin-top:4px; font-family:var(--font-mono); font-size:10.5px; }
+.msg-row.me .msg-meta{ color:rgba(255,255,255,.75); }
+.msg-row.them .msg-meta{ color:var(--text-faint); }
+.msg-meta .ticks.read{ color:#BFE9FF; }
+
+.typing-row{ display:flex; margin:6px 0; }
+.typing-bubble{ background:var(--bubble-recv); border:1px solid var(--bubble-recv-border); padding:12px 16px; border-radius:var(--radius-lg); border-bottom-left-radius:4px; display:flex; gap:4px; }
+.typing-bubble span{ width:6px; height:6px; border-radius:50%; background:var(--text-faint); animation: bounce 1.2s infinite ease-in-out; }
+.typing-bubble span:nth-child(2){ animation-delay:.15s; }
+.typing-bubble span:nth-child(3){ animation-delay:.3s; }
+@keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:.5;} 30%{ transform:translateY(-4px); opacity:1; } }
+
+.composer{ display:flex; align-items:flex-end; gap:8px; padding:12px 18px 16px; background:var(--panel); border-top:1px solid var(--border); position:relative; }
+.composer-btn{ width:40px; height:40px; border-radius:50%; border:none; background:transparent; color:var(--text-dim); font-size:17px; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; transition:.15s ease; }
+.composer-btn:hover{ background:var(--panel-3); color:var(--violet); }
+.input-wrap{ flex:1; background:var(--input-bg); border:1px solid var(--border); border-radius:22px; display:flex; align-items:flex-end; padding:4px 6px 4px 16px; min-height:44px; }
+.input-wrap textarea{ flex:1; border:none; outline:none; background:transparent; resize:none; color:var(--text); font-size:14.5px; line-height:1.4; max-height:120px; padding:8px 0; }
+.input-wrap textarea::placeholder{ color:var(--text-faint); }
+.send-fab{ width:44px; height:44px; border-radius:50%; border:none; background:var(--grad); color:#fff; font-size:15px; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(124,79,234,.4); transition:.15s ease; }
+.send-fab:hover{ transform:scale(1.06); }
+.send-fab:disabled{ opacity:.4; cursor:default; transform:none; }
+.popover{ position:absolute; bottom:64px; left:10px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow); padding:10px; display:none; z-index:20; grid-template-columns:repeat(6,1fr); gap:4px; width:220px; }
+.popover.show{ display:grid; }
+.popover button{ border:none; background:none; font-size:19px; padding:5px; border-radius:8px; cursor:pointer; }
+.popover button:hover{ background:var(--panel-3); }
+
+.empty-state{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; color:var(--text-faint); text-align:center; padding:40px; }
+.empty-state .logo-frame{ width:64px; height:64px; opacity:.9; }
+.empty-state h2{ font-family:var(--font-display); color:var(--text-dim); font-weight:700; font-size:18px; margin:0; }
+.empty-state p{ font-size:13px; max-width:280px; margin:0; }
+
+/* ============ DISCOVER MODAL ============ */
+.modal-scrim{ position:fixed; inset:0; background:var(--scrim); z-index:100; display:none; align-items:flex-start; justify-content:center; padding-top:12vh; }
+.modal-scrim.show{ display:flex; }
+.discover-modal{ width:100%; max-width:420px; background:var(--panel); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:24px; }
+.discover-modal h3{ font-family:var(--font-display); font-size:16px; margin:0 0 4px; }
+.discover-modal p{ color:var(--text-faint); font-size:12.5px; margin:0 0 18px; }
+.discover-row{ display:flex; gap:8px; }
+.discover-row input{ flex:1; background:var(--input-bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:11px 14px; color:var(--text); font-size:14px; outline:none; }
+.discover-row input:focus{ border-color:var(--violet); }
+.discover-row button{ background:var(--grad); border:none; color:#fff; border-radius:var(--radius-sm); padding:0 18px; font-weight:700; cursor:pointer; }
+.discover-result{ margin-top:18px; }
+.result-card{ display:flex; align-items:center; gap:12px; padding:12px; border:1px solid var(--border); border-radius:var(--radius-md); }
+.result-info{ flex:1; min-width:0; }
+.result-name{ font-weight:600; font-size:14px; }
+.result-sub{ font-size:12px; color:var(--text-faint); font-family:var(--font-mono); }
+.result-card button{ background:var(--grad); border:none; color:#fff; border-radius:999px; padding:8px 16px; font-weight:700; font-size:12.5px; cursor:pointer; flex:none; }
+.discover-empty{ text-align:center; color:var(--text-faint); font-size:13px; padding:16px 0; }
+.close-modal{ position:absolute; top:16px; right:16px; }
+
+/* ============ TOAST ============ */
+#toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+/* ============ RESPONSIVE ============ */
+@media (max-width:860px){
+  .app{ grid-template-columns: 1fr; }
+  .chat{ position:fixed; inset:0; transform:translateX(100%); transition:transform .22s ease; z-index:10; }
+  .app.show-chat .chat{ transform:translateX(0); }
+  .app.show-chat .sidebar{ display:none; }
+  .back-btn{ display:flex; }
+  .bubble-wrap{ max-width:82%; }
+  #newChatBtn{ right:18px; bottom:44px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============ SETUP GATE (shown only if CONFIG isn't filled in) ============ -->
+<div id="setupGate" class="hidden">
+  <div class="setup-card">
+    <div class="logo-frame" role="img" aria-label="Speakora logo" style="width:40px; height:40px;"><div class="logomark"></div></div>
+    <h1>Connect Speakora to Supabase</h1>
+    <p>This file needs your own Supabase project before it can run. It only takes two steps:</p>
+    <ol>
+      <li>Create a free project at <code>supabase.com</code> and run <code>schema.sql</code> in the SQL Editor.</li>
+      <li>Open <code>index.html</code> in a text editor and paste your <b>Project URL</b> and <b>anon public key</b> (Project Settings → API) into the <code>CONFIG</code> block near the bottom of the file, then reload this page.</li>
+    </ol>
+  </div>
+</div>
+
+<!-- ============ AUTH SCREEN ============ -->
+<div id="authScreen" class="hidden">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="logo-frame" role="img" aria-label="Speakora logo"><div class="logomark"></div></div>
+      <span>Speakora</span>
+    </div>
+    <div class="auth-tagline">Every message, understood.</div>
+
+    <div class="auth-tabs">
+      <button id="tabLogin" class="active">Log in</button>
+      <button id="tabSignup">Sign up</button>
+    </div>
+
+    <div id="authMsg" class="auth-msg"></div>
+
+    <!-- LOGIN FORM -->
+    <form id="loginForm">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="loginEmail" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="password-wrap">
+          <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password">
+          <button type="button" class="password-toggle" data-target="loginPassword" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye"></i></button>
+        </div>
+      </div>
+      <button type="submit" class="primary-btn" id="loginBtn"><i class="fa-solid fa-arrow-right-to-bracket"></i> Log in</button>
+    </form>
+
+    <!-- SIGNUP FORM -->
+    <form id="signupForm" class="hidden">
+      <div class="field">
+        <label>Email</label>
+        <input type="email" id="signupEmail" placeholder="you@example.com" required autocomplete="email">
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <div class="password-wrap">
+          <input type="password" id="signupPassword" placeholder="At least 6 characters" required minlength="6" autocomplete="new-password">
+          <button type="button" class="password-toggle" data-target="signupPassword" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye"></i></button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Confirm password</label>
+        <div class="password-wrap">
+          <input type="password" id="signupPassword2" placeholder="••••••••" required minlength="6" autocomplete="new-password">
+          <button type="button" class="password-toggle" data-target="signupPassword2" aria-label="Show password" aria-pressed="false"><i class="fa-regular fa-eye"></i></button>
+        </div>
+      </div>
+      <button type="submit" class="primary-btn" id="signupBtn"><i class="fa-solid fa-user-plus"></i> Create account</button>
+    </form>
+
+    <div class="auth-hint" id="authHint">Don't have an account? <a href="#" id="gotoSignup" style="color:var(--violet); text-decoration:none; font-weight:600;">Sign up</a></div>
+  </div>
+</div>
+
+<!-- ============ ONBOARDING SCREEN (step 2: phone number) ============ -->
+<div id="onboardingScreen" class="hidden">
+  <div class="onboard-card">
+    <div class="onboard-step">Step 2 of 2</div>
+    <div class="avatar-preview" id="onboardAvatarPreview">?</div>
+    <h1 style="text-align:center;">One last thing</h1>
+    <p style="text-align:center;">Add your name and phone number so people can find you and message you — just like WhatsApp.</p>
+
+    <div id="onboardMsg" class="auth-msg"></div>
+
+    <form id="onboardForm">
+      <div class="field">
+        <label>Your name</label>
+        <input type="text" id="onboardName" placeholder="e.g. Amina Hassan" required>
+      </div>
+      <div class="field-row">
+        <div class="field dial">
+          <label>Country</label>
+          <select id="onboardDial"></select>
+        </div>
+        <div class="field">
+          <label>Phone number</label>
+          <input type="tel" id="onboardPhone" placeholder="712345678" required>
+        </div>
+      </div>
+      <button type="submit" class="primary-btn" id="onboardBtn"><i class="fa-solid fa-check"></i> Start chatting</button>
+    </form>
+  </div>
+</div>
+
+<!-- ============ MAIN APP ============ -->
+<div class="app hidden" id="app">
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="brand">
+        <div class="logo-frame" role="img" aria-label="Speakora logo"><div class="logomark"></div></div>
+        <span class="brand-name">Speakora</span>
+      </div>
+      <div class="sb-actions">
+        <button class="icon-btn" id="newChatBtn" title="Message someone by phone number"><i class="fa-solid fa-comment-medical"></i></button>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
+        <button class="icon-btn" id="logoutBtn" title="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
+      </div>
+    </div>
+
+    <div class="sb-search">
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="searchInput" placeholder="Search conversations">
+      </div>
+    </div>
+
+    <div class="convo-list scroll" id="convoList"></div>
+
+    <div class="sb-footer">
+      <div class="avatar sm" id="meAvatar">?</div>
+      <div style="min-width:0;">
+        <div class="me-name" id="meName">You</div>
+        <div class="me-sub" id="meSub">—</div>
+      </div>
+    </div>
+  </aside>
+
+  <main class="chat" id="chatPanel">
+    <div class="empty-state" id="emptyState">
+      <div class="logo-frame" role="img" aria-label="Speakora logo"><div class="logomark"></div></div>
+      <h2>Every message, understood</h2>
+      <p>Search for someone by phone number to start a conversation, or pick an existing chat on the left.</p>
+    </div>
+
+    <div id="chatContent" style="display:none; flex-direction:column; height:100%;">
+      <div class="chat-header">
+        <button class="icon-btn back-btn" id="backBtn"><i class="fa-solid fa-arrow-left"></i></button>
+        <div class="chat-id">
+          <div class="avatar" id="chatAvatar">?</div>
+          <div>
+            <div class="chat-name" id="chatName"></div>
+            <div class="chat-status" id="chatStatus"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="messages scroll" id="messages"></div>
+
+      <div class="composer">
+        <button class="composer-btn" id="emojiBtn"><i class="fa-regular fa-face-smile"></i></button>
+        <div class="input-wrap">
+          <textarea id="msgInput" rows="1" placeholder="Type a message…"></textarea>
+        </div>
+        <button class="send-fab" id="sendBtn" disabled><i class="fa-solid fa-paper-plane"></i></button>
+        <div class="popover" id="emojiPop"></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- ============ DISCOVER MODAL ============ -->
+<div class="modal-scrim" id="discoverScrim">
+  <div class="discover-modal" style="position:relative;">
+    <button class="icon-btn close-modal" id="closeDiscover"><i class="fa-solid fa-xmark"></i></button>
+    <h3>Message someone new</h3>
+    <p>Type their full phone number, country code included.</p>
+    <div class="discover-row">
+      <input type="tel" id="discoverInput" placeholder="+254712345678">
+      <button id="discoverBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </div>
+    <div class="discover-result" id="discoverResult"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script>
+
+
+
+
+
+const SUPABASE_URL = "https://xrkvtonkswxaoxhkwfgt.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhya3Z0b25rc3d4YW94aGt3Zmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NTc2OTUsImV4cCI6MjEwMzMzMzY5NX0.1B6g1_TyZH70U7pUiqOGKIwSz0Hq4c3Qd5e4ZiEMDuA";
+</script>
+
+<script>
+(function(){
+'use strict';
+
+/* ============ SETUP GATE CHECK ============ */
+if(!SUPABASE_URL || SUPABASE_URL.indexOf('YOUR_') === 0 || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.indexOf('YOUR_') === 0){
+  document.getElementById('setupGate').classList.remove('hidden');
+  return;
+}
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+/* ============ DIAL CODE / COUNTRY TABLE ============
+   Approximate E.164 lookup for a prototype — not a full libphonenumber
+   replacement, but covers the common cases including a full East Africa set. */
+const DIAL_CODES = [
+  {dial:'+1',   iso:'US', name:'United States / Canada'},
+  {dial:'+7',   iso:'RU', name:'Russia / Kazakhstan'},
+  {dial:'+20',  iso:'EG', name:'Egypt'},
+  {dial:'+27',  iso:'ZA', name:'South Africa'},
+  {dial:'+30',  iso:'GR', name:'Greece'},
+  {dial:'+31',  iso:'NL', name:'Netherlands'},
+  {dial:'+32',  iso:'BE', name:'Belgium'},
+  {dial:'+33',  iso:'FR', name:'France'},
+  {dial:'+34',  iso:'ES', name:'Spain'},
+  {dial:'+39',  iso:'IT', name:'Italy'},
+  {dial:'+40',  iso:'RO', name:'Romania'},
+  {dial:'+44',  iso:'GB', name:'United Kingdom'},
+  {dial:'+45',  iso:'DK', name:'Denmark'},
+  {dial:'+46',  iso:'SE', name:'Sweden'},
+  {dial:'+47',  iso:'NO', name:'Norway'},
+  {dial:'+48',  iso:'PL', name:'Poland'},
+  {dial:'+49',  iso:'DE', name:'Germany'},
+  {dial:'+51',  iso:'PE', name:'Peru'},
+  {dial:'+52',  iso:'MX', name:'Mexico'},
+  {dial:'+53',  iso:'CU', name:'Cuba'},
+  {dial:'+54',  iso:'AR', name:'Argentina'},
+  {dial:'+55',  iso:'BR', name:'Brazil'},
+  {dial:'+56',  iso:'CL', name:'Chile'},
+  {dial:'+57',  iso:'CO', name:'Colombia'},
+  {dial:'+58',  iso:'VE', name:'Venezuela'},
+  {dial:'+60',  iso:'MY', name:'Malaysia'},
+  {dial:'+61',  iso:'AU', name:'Australia'},
+  {dial:'+62',  iso:'ID', name:'Indonesia'},
+  {dial:'+63',  iso:'PH', name:'Philippines'},
+  {dial:'+64',  iso:'NZ', name:'New Zealand'},
+  {dial:'+65',  iso:'SG', name:'Singapore'},
+  {dial:'+66',  iso:'TH', name:'Thailand'},
+  {dial:'+81',  iso:'JP', name:'Japan'},
+  {dial:'+82',  iso:'KR', name:'South Korea'},
+  {dial:'+84',  iso:'VN', name:'Vietnam'},
+  {dial:'+86',  iso:'CN', name:'China'},
+  {dial:'+90',  iso:'TR', name:'Turkey'},
+  {dial:'+91',  iso:'IN', name:'India'},
+  {dial:'+92',  iso:'PK', name:'Pakistan'},
+  {dial:'+93',  iso:'AF', name:'Afghanistan'},
+  {dial:'+94',  iso:'LK', name:'Sri Lanka'},
+  {dial:'+95',  iso:'MM', name:'Myanmar'},
+  {dial:'+98',  iso:'IR', name:'Iran'},
+  {dial:'+211', iso:'SS', name:'South Sudan'},
+  {dial:'+212', iso:'MA', name:'Morocco'},
+  {dial:'+213', iso:'DZ', name:'Algeria'},
+  {dial:'+216', iso:'TN', name:'Tunisia'},
+  {dial:'+218', iso:'LY', name:'Libya'},
+  {dial:'+220', iso:'GM', name:'Gambia'},
+  {dial:'+221', iso:'SN', name:'Senegal'},
+  {dial:'+223', iso:'ML', name:'Mali'},
+  {dial:'+224', iso:'GN', name:'Guinea'},
+  {dial:'+225', iso:'CI', name:'Côte d’Ivoire'},
+  {dial:'+226', iso:'BF', name:'Burkina Faso'},
+  {dial:'+227', iso:'NE', name:'Niger'},
+  {dial:'+228', iso:'TG', name:'Togo'},
+  {dial:'+229', iso:'BJ', name:'Benin'},
+  {dial:'+230', iso:'MU', name:'Mauritius'},
+  {dial:'+231', iso:'LR', name:'Liberia'},
+  {dial:'+232', iso:'SL', name:'Sierra Leone'},
+  {dial:'+233', iso:'GH', name:'Ghana'},
+  {dial:'+234', iso:'NG', name:'Nigeria'},
+  {dial:'+235', iso:'TD', name:'Chad'},
+  {dial:'+236', iso:'CF', name:'Central African Republic'},
+  {dial:'+237', iso:'CM', name:'Cameroon'},
+  {dial:'+238', iso:'CV', name:'Cape Verde'},
+  {dial:'+240', iso:'GQ', name:'Equatorial Guinea'},
+  {dial:'+241', iso:'GA', name:'Gabon'},
+  {dial:'+243', iso:'CD', name:'DR Congo'},
+  {dial:'+244', iso:'AO', name:'Angola'},
+  {dial:'+245', iso:'GW', name:'Guinea-Bissau'},
+  {dial:'+248', iso:'SC', name:'Seychelles'},
+  {dial:'+249', iso:'SD', name:'Sudan'},
+  {dial:'+250', iso:'RW', name:'Rwanda'},
+  {dial:'+251', iso:'ET', name:'Ethiopia'},
+  {dial:'+252', iso:'SO', name:'Somalia'},
+  {dial:'+253', iso:'DJ', name:'Djibouti'},
+  {dial:'+254', iso:'KE', name:'Kenya'},
+  {dial:'+255', iso:'TZ', name:'Tanzania'},
+  {dial:'+256', iso:'UG', name:'Uganda'},
+  {dial:'+257', iso:'BI', name:'Burundi'},
+  {dial:'+258', iso:'MZ', name:'Mozambique'},
+  {dial:'+260', iso:'ZM', name:'Zambia'},
+  {dial:'+261', iso:'MG', name:'Madagascar'},
+  {dial:'+263', iso:'ZW', name:'Zimbabwe'},
+  {dial:'+264', iso:'NA', name:'Namibia'},
+  {dial:'+265', iso:'MW', name:'Malawi'},
+  {dial:'+266', iso:'LS', name:'Lesotho'},
+  {dial:'+267', iso:'BW', name:'Botswana'},
+  {dial:'+268', iso:'SZ', name:'Eswatini'},
+  {dial:'+353', iso:'IE', name:'Ireland'},
+  {dial:'+351', iso:'PT', name:'Portugal'},
+  {dial:'+852', iso:'HK', name:'Hong Kong'},
+  {dial:'+880', iso:'BD', name:'Bangladesh'},
+  {dial:'+971', iso:'AE', name:'United Arab Emirates'},
+  {dial:'+966', iso:'SA', name:'Saudi Arabia'},
+  {dial:'+972', iso:'IL', name:'Israel'},
+  {dial:'+974', iso:'QA', name:'Qatar'},
+];
+const DIAL_CODES_SORTED = [...DIAL_CODES].sort((a,b)=> b.dial.length - a.dial.length);
+
+function countryFromPhone(phone){
+  if(!phone) return null;
+  const match = DIAL_CODES_SORTED.find(d => phone.startsWith(d.dial));
+  return match || null;
+}
+function normalizePhone(raw){
+  if(!raw) return '';
+  let p = raw.trim().replace(/[\s\-().]/g, '');
+  if(!p.startsWith('+')) p = '+' + p.replace(/^0+/, '');
+  return p;
+}
+
+/* ============ DOM ============ */
+const $ = s => document.querySelector(s);
+const setupGate = $('#setupGate');
+const authScreen = $('#authScreen');
+const onboardingScreen = $('#onboardingScreen');
+const app = $('#app');
+
+/* ============ STATE ============ */
+let session = null;
+let me = null;              // auth user
+let myProfile = null;       // profiles row
+let conversations = [];     // list w/ embedded other-party profile
+let activeConvo = null;
+let messagesChannel = null;
+let conversationsChannel = null;
+let presenceChannel = null;
+let onlinePeers = {};
+let typingTimeout = null;
+let renderedMessageIds = new Set();
+
+function showToast(msg){
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(()=> t.classList.remove('show'), 3200);
+}
+function initials(name){
+  if(!name) return '?';
+  return name.split(' ').map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
+}
+function avatarColor(seed){
+  const colors = ['#E23A9C','#7C4FEA','#4A63F0','#E2703A','#39B0D9','#39D98A','#D93974'];
+  let h = 0; for(let i=0;i<(seed||'').length;i++) h = (h*31 + seed.charCodeAt(i)) % colors.length;
+  return colors[Math.abs(h)];
+}
+function timeLabel(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+/* ============ THEME ============ */
+function applyTheme(t){
+  document.documentElement.setAttribute('data-theme', t);
+  const btn = $('#themeBtn');
+  if(btn) btn.innerHTML = t==='dark' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
+  try{ localStorage.setItem('speakora-theme', t); }catch(e){}
+}
+let savedTheme = 'dark';
+try{ savedTheme = localStorage.getItem('speakora-theme') || 'dark'; }catch(e){}
+applyTheme(savedTheme);
+
+/* ============ AUTH SCREEN WIRING ============ */
+$('#tabLogin').addEventListener('click', ()=> switchAuthTab('login'));
+$('#tabSignup').addEventListener('click', ()=> switchAuthTab('signup'));
+$('#gotoSignup').addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('signup'); });
+
+function switchAuthTab(which){
+  $('#tabLogin').classList.toggle('active', which==='login');
+  $('#tabSignup').classList.toggle('active', which==='signup');
+  $('#loginForm').classList.toggle('hidden', which!=='login');
+  $('#signupForm').classList.toggle('hidden', which!=='signup');
+  $('#authHint').innerHTML = which==='login'
+    ? `Don't have an account? <a href="#" id="gotoSignup2" style="color:var(--violet); text-decoration:none; font-weight:600;">Sign up</a>`
+    : `Already have an account? <a href="#" id="gotoLogin2" style="color:var(--violet); text-decoration:none; font-weight:600;">Log in</a>`;
+  const s2 = $('#gotoSignup2'); if(s2) s2.addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('signup'); });
+  const l2 = $('#gotoLogin2'); if(l2) l2.addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('login'); });
+  hideAuthMsg();
+}
+function showAuthMsg(msg, type){
+  const el = $('#authMsg');
+  el.textContent = msg;
+  el.className = 'auth-msg show ' + (type||'error');
+}
+function hideAuthMsg(){ $('#authMsg').className = 'auth-msg'; }
+
+document.querySelectorAll('.password-toggle').forEach(toggle=>{
+  toggle.addEventListener('click', ()=>{
+    const input = document.getElementById(toggle.dataset.target);
+    if(!input) return;
+    const showing = input.type === 'password';
+    input.type = showing ? 'text' : 'password';
+    toggle.setAttribute('aria-label', showing ? 'Hide password' : 'Show password');
+    toggle.setAttribute('aria-pressed', String(showing));
+    toggle.innerHTML = `<i class="fa-regular ${showing ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
+  });
+});
+
+$('#loginForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  hideAuthMsg();
+  const email = $('#loginEmail').value.trim();
+  const password = $('#loginPassword').value;
+  const btn = $('#loginBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Log in';
+  if(error){ showAuthMsg(error.message, 'error'); return; }
+  await handleAuthenticated(data.session);
+});
+
+$('#signupForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  hideAuthMsg();
+  const email = $('#signupEmail').value.trim();
+  const password = $('#signupPassword').value;
+  const password2 = $('#signupPassword2').value;
+  if(password !== password2){ showAuthMsg("Passwords don't match.", 'error'); return; }
+  const btn = $('#signupBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account…';
+  const { data, error } = await sb.auth.signUp({ email, password });
+  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create account';
+  if(error){
+    const rateLimited = error.status === 429 || error.code === 'over_email_send_rate_limit';
+    showAuthMsg(rateLimited
+      ? 'Too many signup emails were requested. Please wait and try again later, or ask the project owner to configure a custom SMTP provider.'
+      : error.message, 'error');
+    return;
+  }
+  if(!data.session){
+    // email confirmation is required by this project's auth settings
+    switchAuthTab('login');
+    showAuthMsg('Account created. Check your email to confirm it, then log in.', 'info');
+    return;
+  }
+  await handleAuthenticated(data.session);
+});
+
+/* ============ ONBOARDING WIRING ============ */
+function populateDialSelect(){
+  const sel = $('#onboardDial');
+  sel.innerHTML = DIAL_CODES.map(d => `<option value="${d.dial}">${d.dial} ${d.name}</option>`).join('');
+  sel.value = '+254'; // sensible default for this build's target market
+}
+populateDialSelect();
+
+$('#onboardForm').addEventListener('submit', async e=>{
+  e.preventDefault();
+  const msgEl = $('#onboardMsg'); msgEl.className = 'auth-msg';
+  const name = $('#onboardName').value.trim();
+  const dial = $('#onboardDial').value;
+  const rest = $('#onboardPhone').value.trim().replace(/[\s\-().]/g,'').replace(/^0+/, '');
+  if(!/^[0-9]{4,14}$/.test(rest)){
+    msgEl.textContent = 'Enter a valid phone number (digits only, no leading 0).';
+    msgEl.className = 'auth-msg show error';
+    return;
+  }
+  const phone = dial + rest;
+  const btn = $('#onboardBtn');
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
+
+  const country = countryFromPhone(phone);
+  const { data, error } = await sb.from('profiles').update({
+    display_name: name,
+    phone: phone,
+    dial_code: dial,
+    country_code: country ? country.iso : null,
+    country_name: country ? country.name : null,
+  }).eq('id', me.id).select().single();
+
+  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Start chatting';
+
+  if(error){
+    msgEl.textContent = error.code === '23505'
+      ? 'That phone number is already registered to another account.'
+      : error.message;
+    msgEl.className = 'auth-msg show error';
+    return;
+  }
+  myProfile = data;
+  enterApp();
+});
+
+$('#onboardName').addEventListener('input', e=>{
+  $('#onboardAvatarPreview').textContent = initials(e.target.value) || '?';
+});
+
+/* ============ SESSION BOOTSTRAP ============ */
+async function handleAuthenticated(sess){
+  session = sess;
+  me = sess.user;
+  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', me.id).single();
+  if(error || !profile){
+    showToast("Couldn't load your profile. Try logging in again.");
+    return;
+  }
+  myProfile = profile;
+  if(!myProfile.phone){
+    goToOnboarding();
+  } else {
+    enterApp();
+  }
+}
+
+function goToOnboarding(){
+  authScreen.classList.add('hidden');
+  app.classList.add('hidden');
+  onboardingScreen.classList.remove('hidden');
+  $('#onboardAvatarPreview').textContent = initials(myProfile.email);
+}
+
+async function enterApp(){
+  authScreen.classList.add('hidden');
+  onboardingScreen.classList.add('hidden');
+  app.classList.remove('hidden');
+
+  const country = countryFromPhone(myProfile.phone);
+  $('#meAvatar').style.background = avatarColor(myProfile.id);
+  $('#meAvatar').textContent = initials(myProfile.display_name || myProfile.email);
+  $('#meName').textContent = myProfile.display_name || myProfile.email;
+  $('#meSub').textContent = country ? `${myProfile.phone} · ${country.name}` : myProfile.phone;
+
+  await loadConversations();
+  subscribeToConversations();
+  subscribeToPresence();
+}
+
+/* ============ CONVERSATIONS ============ */
+async function loadConversations(){
+  const { data, error } = await sb
+    .from('conversations')
+    .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
+    .or(`user_a.eq.${me.id},user_b.eq.${me.id}`)
+    .order('last_message_at', { ascending:false, nullsFirst:false });
+
+  if(error){ showToast('Could not load conversations.'); return; }
+  conversations = data || [];
+  renderConvoList($('#searchInput').value);
+}
+
+function otherParty(convo){
+  return convo.user_a === me.id ? convo.b : convo.a;
+}
+function myUnreadField(convo){
+  return convo.user_a === me.id ? 'unread_a' : 'unread_b';
+}
+
+function renderConvoList(filter){
+  const list = $('#convoList');
+  const term = (filter||'').toLowerCase();
+  const filtered = conversations.filter(c=>{
+    const other = otherParty(c);
+    return !term || (other.display_name||'').toLowerCase().includes(term) || (other.phone||'').includes(term);
+  });
+
+  if(!filtered.length){
+    list.innerHTML = `<div class="empty-list">No conversations yet.<br>Tap the message icon above and enter a phone number to start one.</div>`;
+    return;
+  }
+
+  list.innerHTML = '';
+  filtered.forEach(c=>{
+    const other = otherParty(c);
+    const unread = c[myUnreadField(c)] || 0;
+    const isOnline = !!onlinePeers[other.id];
+    const previewPrefix = c.last_message_sender_id === me.id ? 'You: ' : '';
+    const preview = c.last_message_body ? previewPrefix + c.last_message_body : 'Say hello 👋';
+    const item = document.createElement('div');
+    item.className = 'convo' + (activeConvo && activeConvo.id===c.id ? ' active' : '');
+    item.innerHTML = `
+      <div class="avatar" style="background:${avatarColor(other.id)}">${initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
+      <div class="convo-body">
+        <div class="convo-top">
+          <div class="convo-name">${escapeHtml(other.display_name || other.phone || 'Unknown')}</div>
+          <div class="convo-time">${timeLabel(c.last_message_at)}</div>
+        </div>
+        <div class="convo-bottom">
+          <div class="convo-preview">${escapeHtml(preview)}</div>
+          <div class="convo-meta">
+            ${other.country_code ? `<span class="lang-pill">${other.country_code}</span>` : ''}
+            ${unread ? `<span class="unread">${unread}</span>` : ''}
+          </div>
+        </div>
+      </div>`;
+    item.addEventListener('click', ()=> openConversation(c));
+    list.appendChild(item);
+  });
+}
+$('#searchInput').addEventListener('input', e=> renderConvoList(e.target.value));
+
+function subscribeToConversations(){
+  if(conversationsChannel) sb.removeChannel(conversationsChannel);
+  conversationsChannel = sb.channel('conversations-watch')
+    .on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, payload=>{
+      const row = payload.new || payload.old;
+      if(row && (row.user_a === me.id || row.user_b === me.id)){
+        loadConversations();
+        if(activeConvo && row.id === activeConvo.id){
+          activeConvo = { ...activeConvo, ...payload.new };
+        }
+      }
+    })
+    .subscribe();
+}
+
+function subscribeToPresence(){
+  presenceChannel = sb.channel('online-users', { config: { presence: { key: me.id } } });
+  presenceChannel.on('presence', { event:'sync' }, ()=>{
+    onlinePeers = presenceChannel.presenceState();
+    renderConvoList($('#searchInput').value);
+    if(activeConvo) updateChatHeaderStatus();
+  });
+  presenceChannel.subscribe(async status=>{
+    if(status === 'SUBSCRIBED') await presenceChannel.track({ online:true });
+  });
+}
+
+/* ============ ACTIVE CONVERSATION ============ */
+async function openConversation(convo){
+  activeConvo = convo;
+  renderedMessageIds = new Set();
+  $('#emptyState').style.display = 'none';
+  $('#chatContent').style.display = 'flex';
+  app.classList.add('show-chat');
+
+  const other = otherParty(convo);
+  $('#chatAvatar').style.background = avatarColor(other.id);
+  $('#chatAvatar').textContent = initials(other.display_name || other.phone);
+  $('#chatName').textContent = other.display_name || other.phone || 'Unknown';
+  updateChatHeaderStatus();
+
+  // clear my unread counter locally + on the server, then paint the sidebar
+  const field = myUnreadField(convo);
+  if(convo[field]){
+    convo[field] = 0;
+    sb.rpc('mark_conversation_read', { p_conversation_id: convo.id }).then(()=>{});
+  }
+  renderConvoList($('#searchInput').value);
+
+  await loadMessages(convo.id);
+  subscribeToMessages(convo.id);
+}
+
+function updateChatHeaderStatus(){
+  if(!activeConvo) return;
+  const other = otherParty(activeConvo);
+  const isOnline = !!onlinePeers[other.id];
+  const country = other.country_name ? ` · ${other.country_name}` : '';
+  $('#chatStatus').innerHTML = isOnline
+    ? `<span class="dot-online"></span> online${country}`
+    : (other.country_name || '');
+}
+
+async function loadMessages(conversationId){
+  const { data, error } = await sb
+    .from('messages')
+    .select('*')
+    .eq('conversation_id', conversationId)
+    .order('created_at', { ascending:true });
+
+  if(error){ showToast('Could not load messages.'); return; }
+
+  const box = $('#messages');
+  box.innerHTML = '';
+  const chip = document.createElement('div');
+  chip.className = 'date-chip';
+  chip.textContent = 'Today';
+  box.appendChild(chip);
+
+  (data||[]).forEach(m=>{
+    renderedMessageIds.add(m.id);
+    box.appendChild(renderMessageRow(m));
+  });
+  scrollBottom();
+
+  // mark their unread messages as read
+  const unreadIncoming = (data||[]).filter(m => m.sender_id !== me.id && m.status !== 'read');
+  if(unreadIncoming.length){
+    sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
+  }
+}
+
+function renderMessageRow(m){
+  const row = document.createElement('div');
+  row.className = 'msg-row ' + (m.sender_id === me.id ? 'me' : 'them');
+  row.dataset.id = m.id;
+  const ticks = m.status === 'read' ? 'fa-check-double read' : 'fa-check';
+  row.innerHTML = `
+    <div class="bubble-wrap">
+      <div class="bubble">
+        <div class="msg-text">${escapeHtml(m.body)}</div>
+        <div class="msg-meta">
+          <span>${timeLabel(m.created_at)}</span>
+          ${m.sender_id===me.id ? `<span class="ticks ${m.status==='read'?'read':''}"><i class="fa-solid ${ticks.replace(' read','')}"></i></span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  return row;
+}
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function scrollBottom(){ const box = $('#messages'); requestAnimationFrame(()=>{ box.scrollTop = box.scrollHeight; }); }
+
+function subscribeToMessages(conversationId){
+  if(messagesChannel) sb.removeChannel(messagesChannel);
+  messagesChannel = sb.channel('messages-' + conversationId)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
+      const m = payload.new;
+      if(renderedMessageIds.has(m.id)) return;
+      renderedMessageIds.add(m.id);
+      $('#messages').appendChild(renderMessageRow(m));
+      scrollBottom();
+      if(m.sender_id !== me.id){
+        hideTyping();
+        sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
+      }
+    })
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
+      const m = payload.new;
+      const row = $(`.msg-row[data-id="${m.id}"]`);
+      if(row){
+        const tick = row.querySelector('.ticks');
+        if(tick){ tick.classList.toggle('read', m.status==='read'); tick.innerHTML = `<i class="fa-solid fa-check-double"></i>`; }
+      }
+    })
+    .on('broadcast', { event:'typing' }, payload=>{
+      if(payload.payload && payload.payload.userId !== me.id) showTyping();
+    })
+    .subscribe();
+}
+
+let typingRowEl = null, typingHideTimer = null;
+function showTyping(){
+  if(!activeConvo) return;
+  $('#chatStatus').classList.add('typing');
+  $('#chatStatus').innerHTML = '<span class="typing">typing…</span>';
+  if(!typingRowEl){
+    typingRowEl = document.createElement('div');
+    typingRowEl.className = 'typing-row';
+    typingRowEl.innerHTML = `<div class="typing-bubble"><span></span><span></span><span></span></div>`;
+    $('#messages').appendChild(typingRowEl);
+    scrollBottom();
+  }
+  clearTimeout(typingHideTimer);
+  typingHideTimer = setTimeout(hideTyping, 2500);
+}
+function hideTyping(){
+  $('#chatStatus').classList.remove('typing');
+  updateChatHeaderStatus();
+  if(typingRowEl){ typingRowEl.remove(); typingRowEl = null; }
+}
+
+/* ============ COMPOSER ============ */
+const msgInput = $('#msgInput');
+const sendBtn = $('#sendBtn');
+msgInput.addEventListener('input', ()=>{
+  sendBtn.disabled = msgInput.value.trim().length === 0;
+  autoGrow();
+  if(messagesChannel && activeConvo){
+    messagesChannel.send({ type:'broadcast', event:'typing', payload:{ userId: me.id } });
+  }
+});
+msgInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendMessage(); }
+});
+function autoGrow(){
+  msgInput.style.height = 'auto';
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
+}
+sendBtn.addEventListener('click', sendMessage);
+
+async function sendMessage(){
+  const text = msgInput.value.trim();
+  if(!text || !activeConvo) return;
+  msgInput.value = '';
+  sendBtn.disabled = true;
+  autoGrow();
+
+  const optimisticId = 'temp-' + Date.now();
+  const optimistic = { id: optimisticId, sender_id: me.id, body: text, status:'sent', created_at: new Date().toISOString() };
+  renderedMessageIds.add(optimisticId);
+  $('#messages').appendChild(renderMessageRow(optimistic));
+  scrollBottom();
+
+  const { data, error } = await sb.from('messages').insert({
+    conversation_id: activeConvo.id, sender_id: me.id, body: text
+  }).select().single();
+
+  if(error){
+    showToast('Message failed to send.');
+    const row = $(`.msg-row[data-id="${optimisticId}"]`);
+    if(row) row.style.opacity = '.4';
+    return;
+  }
+  // swap the optimistic row's id for the real one so realtime echo is deduped
+  const row = $(`.msg-row[data-id="${optimisticId}"]`);
+  if(row) row.dataset.id = data.id;
+  renderedMessageIds.delete(optimisticId);
+  renderedMessageIds.add(data.id);
+}
+
+/* ============ EMOJI POPOVER ============ */
+const emojis = ['😀','😂','😍','🙌','👍','🔥','🎉','❤️','😅','🤔','👏','😢','😎','🙏','💯','😴','🥳','😇','🚀','✨','😊','🤝','👋','☕'];
+$('#emojiPop').innerHTML = emojis.map(e=>`<button type="button">${e}</button>`).join('');
+$('#emojiPop').addEventListener('click', e=>{
+  const b = e.target.closest('button'); if(!b) return;
+  msgInput.value += b.textContent;
+  msgInput.dispatchEvent(new Event('input'));
+  msgInput.focus();
+});
+$('#emojiBtn').addEventListener('click', ()=> $('#emojiPop').classList.toggle('show'));
+document.addEventListener('click', e=>{
+  if(!e.target.closest('#emojiBtn') && !e.target.closest('#emojiPop')) $('#emojiPop').classList.remove('show');
+});
+
+/* ============ DISCOVER (find someone by phone) ============ */
+$('#newChatBtn').addEventListener('click', ()=>{
+  $('#discoverScrim').classList.add('show');
+  $('#discoverInput').value = '';
+  $('#discoverResult').innerHTML = '';
+  $('#discoverInput').focus();
+});
+$('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
+$('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
+
+async function runDiscover(){
+  const raw = $('#discoverInput').value.trim();
+  if(!raw) return;
+  const phone = normalizePhone(raw);
+  const resultBox = $('#discoverResult');
+  resultBox.innerHTML = `<div class="discover-empty"><i class="fa-solid fa-spinner fa-spin"></i> Searching…</div>`;
+
+  if(phone === myProfile.phone){
+    resultBox.innerHTML = `<div class="discover-empty">That's your own number.</div>`;
+    return;
+  }
+  const { data, error } = await sb.from('profiles').select('*').eq('phone', phone).maybeSingle();
+  if(error || !data){
+    resultBox.innerHTML = `<div class="discover-empty">No Speakora user found with that number yet.</div>`;
+    return;
+  }
+  const country = countryFromPhone(data.phone);
+  resultBox.innerHTML = `
+    <div class="result-card">
+      <div class="avatar sm" style="background:${avatarColor(data.id)}">${initials(data.display_name||data.phone)}</div>
+      <div class="result-info">
+        <div class="result-name">${escapeHtml(data.display_name || 'Speakora user')}</div>
+        <div class="result-sub">${data.phone}${country ? ' · ' + country.name : ''}</div>
+      </div>
+      <button id="startChatBtn">Message</button>
+    </div>`;
+  $('#startChatBtn').addEventListener('click', ()=> startConversationWith(data));
+}
+$('#discoverBtn').addEventListener('click', runDiscover);
+$('#discoverInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runDiscover(); });
+
+async function startConversationWith(otherProfile){
+  const a = me.id < otherProfile.id ? me.id : otherProfile.id;
+  const b = me.id < otherProfile.id ? otherProfile.id : me.id;
+
+  let convoRow = null;
+  const existing = await sb.from('conversations')
+    .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
+    .eq('user_a', a).eq('user_b', b).maybeSingle();
+
+  if(existing.data){
+    convoRow = existing.data;
+  } else {
+    const inserted = await sb.from('conversations').insert({ user_a:a, user_b:b }).select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)').single();
+    if(inserted.error){
+      // race: someone else created it a moment earlier — just re-fetch
+      const retry = await sb.from('conversations')
+        .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
+        .eq('user_a', a).eq('user_b', b).maybeSingle();
+      convoRow = retry.data;
+    } else {
+      convoRow = inserted.data;
+    }
+  }
+
+  if(!convoRow){ showToast('Could not start conversation.'); return; }
+
+  $('#discoverScrim').classList.remove('show');
+  await loadConversations();
+  const fresh = conversations.find(c=>c.id === convoRow.id) || convoRow;
+  openConversation(fresh);
+}
+
+/* ============ BACK / THEME / LOGOUT ============ */
+$('#backBtn').addEventListener('click', ()=> app.classList.remove('show-chat'));
+$('#themeBtn').addEventListener('click', ()=>{
+  const cur = document.documentElement.getAttribute('data-theme');
+  applyTheme(cur==='dark' ? 'light' : 'dark');
+});
+$('#logoutBtn').addEventListener('click', async ()=>{
+  if(presenceChannel) await presenceChannel.untrack();
+  if(messagesChannel) sb.removeChannel(messagesChannel);
+  if(conversationsChannel) sb.removeChannel(conversationsChannel);
+  if(presenceChannel) sb.removeChannel(presenceChannel);
+  await sb.auth.signOut();
+  location.reload();
+});
+
+/* ============ BOOT ============ */
+(async function boot(){
+  const { data } = await sb.auth.getSession();
+  if(data.session){
+    await handleAuthenticated(data.session);
+  } else {
+    authScreen.classList.remove('hidden');
+  }
+})();
+
+})();
+</script>
+</body>
+</html>
