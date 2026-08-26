@@ -753,8 +753,12 @@ function animateNotification(type){
   if(!button) return;
   button.classList.remove('notify-other', 'notify-same');
   void button.offsetWidth;
-  button.classList.add(type === 'same' ? 'notify-same' : 'notify-other');
-  setTimeout(()=> button.classList.remove('notify-other', 'notify-same'), type === 'same' ? 1300 : 2900);
+  const sameConversation = type === 'same';
+  button.classList.add(sameConversation ? 'notify-same' : 'notify-other');
+  if('vibrate' in navigator){
+    try{ navigator.vibrate(sameConversation ? [70, 45, 70] : [120, 70, 120, 70, 120]); }catch(e){}
+  }
+  setTimeout(()=> button.classList.remove('notify-other', 'notify-same'), sameConversation ? 1300 : 2900);
 }
 function initials(name){
   if(!name) return '?';
@@ -1620,8 +1624,6 @@ $('#logoutBtn').addEventListener('click', async ()=>{
   }
 })();
 
-
-  
 })();
 </script>
 </body>
