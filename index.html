@@ -307,6 +307,7 @@ button,input,select,textarea{font-family:inherit;}
 .share-actions button{ flex:1; border:0; border-radius:var(--radius-sm); padding:11px 10px; font-weight:700; cursor:pointer; }
 .share-primary{ background:var(--grad); color:#fff; }
 .share-secondary{ background:var(--panel-2); color:var(--text); }
+.delete-choice-modal{position:relative;max-width:380px}.delete-choice-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}.delete-choice-actions button{border:0;border-radius:var(--radius-sm);padding:11px 12px;font-weight:700;cursor:pointer}.delete-choice-all{background:var(--danger);color:#fff}.delete-choice-me{background:var(--grad);color:#fff}.delete-choice-cancel{background:var(--panel-2);color:var(--text)}
 
 /* ============ TOAST ============ */
 #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
@@ -561,6 +562,19 @@ button,input,select,textarea{font-family:inherit;}
     <div class="share-actions">
       <button type="button" class="share-primary" id="nativeShareBtn"><i class="fa-solid fa-share-nodes"></i> Share</button>
       <button type="button" class="share-secondary" id="copyShareBtn"><i class="fa-regular fa-copy"></i> Copy link</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-scrim" id="deleteChoiceScrim">
+  <div class="discover-modal delete-choice-modal">
+    <button class="icon-btn close-modal" id="closeDeleteChoice"><i class="fa-solid fa-xmark"></i></button>
+    <h3>Delete message</h3>
+    <p id="deleteChoiceHint">Choose where you want to delete this message.</p>
+    <div class="delete-choice-actions">
+      <button type="button" class="delete-choice-all" id="deleteForAllChoice">Delete for everyone</button>
+      <button type="button" class="delete-choice-me" id="deleteForMeChoice">Delete for me</button>
+      <button type="button" class="delete-choice-cancel" id="cancelDeleteChoice">Cancel</button>
     </div>
   </div>
 </div>
@@ -1325,12 +1339,30 @@ async function editSelectedMessage(){
   refreshPinnedMessagesBar();
   clearMessageSelection();
 }
+function chooseDeleteMode(ownOnly){
+  return new Promise(resolve=>{
+    const scrim=$('#deleteChoiceScrim'), allBtn=$('#deleteForAllChoice'), meBtn=$('#deleteForMeChoice');
+    $('#deleteChoiceHint').textContent = ownOnly
+      ? 'Delete this message for everyone, or only remove it from your view.'
+      : 'You can only remove someone else’s message from your own view.';
+    allBtn.style.display = ownOnly ? 'block' : 'none';
+    scrim.classList.add('show');
+    let done=false;
+    const finish=mode=>{ if(done)return; done=true; scrim.classList.remove('show'); resolve(mode); };
+    allBtn.onclick=()=>finish('all');
+    meBtn.onclick=()=>finish('me');
+    $('#cancelDeleteChoice').onclick=()=>finish(null);
+    $('#closeDeleteChoice').onclick=()=>finish(null);
+    scrim.onclick=e=>{ if(e.target===scrim) finish(null); };
+  });
+}
 async function deleteSelectedMessages(){
   const ids = [...selectedMessageIds];
   if(!ids.length) return;
   const ownOnly = ids.every(id => (messageCache.get(id)||{}).sender_id === me.id);
-  const deleteForAll = ownOnly && window.confirm('Delete this message for everyone?\n\nPress Cancel to delete it only for you.');
-  if(!deleteForAll && !window.confirm('Delete this message only for you?')) return;
+  const deleteMode = await chooseDeleteMode(ownOnly);
+  if(!deleteMode) return;
+  const deleteForAll = deleteMode === 'all';
   for(const id of ids){
     const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
     const { error } = await sb.rpc(rpc, { p_message_id:id });
