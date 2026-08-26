@@ -146,12 +146,12 @@ button,input,select,textarea{font-family:inherit;}
 }
 .icon-btn:hover{ background:var(--panel-3); color:var(--text); }
 #newChatBtn{
-  position:fixed; right:24px; bottom:24px; z-index:30; width:56px; height:56px;
+  position:absolute; right:16px; bottom:16px; z-index:30; width:56px; height:56px;
   background:var(--grad); color:#fff; font-size:18px;
   box-shadow:0 10px 24px rgba(74,63,180,.45);
 }
 #newChatBtn:hover{ background:var(--grad); color:#fff; transform:translateY(-2px); }
-.app.show-chat #newChatBtn{ bottom:88px; }
+.convo-list{ position:relative; }
 .more-wrap{ position:relative; }
 .more-menu{
   position:absolute; top:44px; right:0; z-index:50; min-width:190px; padding:6px;
@@ -194,9 +194,9 @@ button,input,select,textarea{font-family:inherit;}
 .me-sub{ font-size:11.5px; color:var(--text-faint); }
 
 /* ============ CHAT PANEL ============ */
-.chat{ display:flex; flex-direction:column; min-width:0; position:relative;
+.chat{ display:flex; flex-direction:column; min-width:0; min-height:0; position:relative;
   background: radial-gradient(circle at 15% 0%, rgba(226,58,156,.05), transparent 40%), radial-gradient(circle at 85% 100%, rgba(74,99,240,.06), transparent 40%), var(--bg); }
-#chatContent{ min-height:0; }
+#chatContent{ min-height:0; overflow:hidden; }
 .chat-header{ display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid var(--border); background:var(--panel); }
 .back-btn{ display:none; }
 .chat-notify-btn{ position:relative; width:40px; height:40px; border:0; border-radius:50%; background:var(--panel-2); color:var(--text-dim); cursor:pointer; display:flex; align-items:center; justify-content:center; flex:none; }
@@ -222,6 +222,7 @@ button,input,select,textarea{font-family:inherit;}
 .message-actions button:disabled{ opacity:.4; cursor:not-allowed; }
 .msg-row.selected .bubble{ outline:2px solid var(--violet); outline-offset:2px; }
 .msg-row.pinned .bubble::after{ content:'📌'; position:absolute; top:-9px; right:8px; font-size:12px; }
+.msg-row.deleted .msg-text{ font-style:italic; opacity:.7; }
 .msg-edited{ font-size:10px; opacity:.75; margin-left:4px; }
 .date-chip{ align-self:center; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); background:var(--panel-2); padding:5px 12px; border-radius:999px; margin:14px 0 18px; }
 .msg-row{ display:flex; margin:3px 0; max-width:100%; }
@@ -244,7 +245,7 @@ button,input,select,textarea{font-family:inherit;}
 .typing-bubble span:nth-child(3){ animation-delay:.3s; }
 @keyframes bounce{ 0%,60%,100%{ transform:translateY(0); opacity:.5;} 30%{ transform:translateY(-4px); opacity:1; } }
 
-.composer{ display:flex; align-items:flex-end; gap:8px; padding:12px 18px 16px; background:var(--panel); border-top:1px solid var(--border); position:relative; }
+.composer{ display:flex; flex:0 0 auto; align-items:flex-end; gap:8px; padding:12px 18px max(16px, env(safe-area-inset-bottom)); background:var(--panel); border-top:1px solid var(--border); position:sticky; bottom:0; z-index:10; }
 .composer-btn{ width:40px; height:40px; border-radius:50%; border:none; background:transparent; color:var(--text-dim); font-size:17px; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center; transition:.15s ease; }
 .composer-btn:hover{ background:var(--panel-3); color:var(--violet); }
 .input-wrap{ flex:1; background:var(--input-bg); border:1px solid var(--border); border-radius:22px; display:flex; align-items:flex-end; padding:4px 6px 4px 16px; min-height:44px; }
@@ -304,8 +305,6 @@ button,input,select,textarea{font-family:inherit;}
   .app.show-chat .sidebar{ display:none; }
   .back-btn{ display:flex; }
   .bubble-wrap{ max-width:82%; }
-  #newChatBtn{ right:18px; bottom:44px; }
-  .app.show-chat #newChatBtn{ bottom:102px; }
 }
 </style>
 </head>
@@ -422,7 +421,6 @@ button,input,select,textarea{font-family:inherit;}
         <span class="brand-name">Speakora</span>
       </div>
       <div class="sb-actions">
-        <button class="icon-btn" id="newChatBtn" title="Message someone by phone number"><i class="fa-solid fa-comment-medical"></i></button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme"><i class="fa-solid fa-moon"></i></button>
         <div class="more-wrap">
           <button class="icon-btn" id="moreBtn" title="More options" aria-label="More options" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
@@ -442,7 +440,10 @@ button,input,select,textarea{font-family:inherit;}
       </div>
     </div>
 
-    <div class="convo-list scroll" id="convoList"></div>
+      <div class="convo-list scroll" id="convoList">
+        <div id="convoItems"></div>
+        <button class="icon-btn" id="newChatBtn" title="Message someone by phone number"><i class="fa-solid fa-comment-medical"></i></button>
+      </div>
 
     <div class="sb-footer">
       <div class="avatar sm" id="meAvatar">?</div>
@@ -483,6 +484,7 @@ button,input,select,textarea{font-family:inherit;}
         <button type="button" id="deleteMessageBtn" title="Delete selected messages"><i class="fa-solid fa-trash"></i></button>
         <button type="button" id="forwardMessageBtn" title="Forward selected message"><i class="fa-solid fa-share"></i></button>
         <button type="button" id="pinMessageBtn" title="Pin selected message"><i class="fa-solid fa-thumbtack"></i></button>
+        <button type="button" id="copyMessageBtn" title="Copy selected message"><i class="fa-regular fa-copy"></i></button>
         <button type="button" id="clearMessageSelection" title="Clear selection"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
@@ -729,10 +731,11 @@ function updateMessageActions(){
   bar.classList.toggle('hidden', ids.length === 0);
   $('#selectedMessageCount').textContent = `${ids.length} selected`;
   const selected = ids.map(id => messageCache.get(id)).filter(Boolean);
-  $('#editMessageBtn').disabled = selected.length !== 1 || selected[0].sender_id !== me.id;
+  $('#editMessageBtn').disabled = selected.length !== 1 || selected[0].sender_id !== me.id || !!selected[0].deleted_at;
   $('#deleteMessageBtn').disabled = selected.length === 0 || selected.some(m => m.sender_id !== me.id);
   $('#forwardMessageBtn').disabled = selected.length !== 1;
   $('#pinMessageBtn').disabled = selected.length !== 1;
+  $('#copyMessageBtn').disabled = selected.length !== 1;
 }
 function clearMessageSelection(){
   selectedMessageIds.clear();
@@ -1020,7 +1023,7 @@ function myUnreadField(convo){
 }
 
 function renderConvoList(filter){
-  const list = $('#convoList');
+  const list = $('#convoItems');
   const term = (filter||'').toLowerCase();
   const filtered = conversations.filter(c=>{
     const other = otherParty(c);
@@ -1151,6 +1154,9 @@ async function loadMessages(conversationId){
     .order('created_at', { ascending:true });
 
   if(error){ showToast('Could not load messages.'); return; }
+  const { data: hiddenRows } = await sb.from('message_hidden').select('message_id').eq('user_id', me.id);
+  const hiddenIds = new Set((hiddenRows || []).map(row => row.message_id));
+  const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
 
   const box = $('#messages');
   box.innerHTML = '';
@@ -1161,14 +1167,14 @@ async function loadMessages(conversationId){
   chip.textContent = 'Today';
   box.appendChild(chip);
 
-  (data||[]).forEach(m=>{
+  visibleMessages.forEach(m=>{
     renderedMessageIds.add(m.id);
     box.appendChild(renderMessageRow(m));
   });
   scrollBottom();
 
   // mark their unread messages as read
-  const unreadIncoming = (data||[]).filter(m => m.sender_id !== me.id && m.status !== 'read');
+  const unreadIncoming = visibleMessages.filter(m => m.sender_id !== me.id && m.status !== 'read');
   if(unreadIncoming.length){
     sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
   }
@@ -1195,6 +1201,7 @@ function renderMessageRow(m){
     toggleMessageSelection(m.id);
   });
   if(m.pinned_at) row.classList.add('pinned');
+  if(m.deleted_at) row.classList.add('deleted');
   return row;
 }
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
@@ -1214,12 +1221,26 @@ async function editSelectedMessage(){
 }
 async function deleteSelectedMessages(){
   const ids = [...selectedMessageIds];
-  if(!ids.length || !window.confirm(`Delete ${ids.length} message${ids.length===1?'':'s'}?`)) return;
+  if(!ids.length) return;
+  const mode = window.prompt('Type ALL to delete for everyone, or ME to delete only for you:', 'ME');
+  if(!mode) return;
+  const deleteForAll = mode.trim().toLowerCase() === 'all';
+  if(!deleteForAll && mode.trim().toLowerCase() !== 'me') return;
   for(const id of ids){
-    const { error } = await sb.rpc('delete_message', { p_message_id:id });
+    const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
+    const { error } = await sb.rpc(rpc, { p_message_id:id });
     if(error){ showToast('Some messages could not be deleted.'); continue; }
-    const row = $(`.msg-row[data-id="${id}"]`); if(row) row.remove();
-    messageCache.delete(id); selectedMessageIds.delete(id);
+    const row = $(`.msg-row[data-id="${id}"]`);
+    if(deleteForAll){
+      const message = messageCache.get(id) || {};
+      message.body = 'This message was deleted'; message.deleted_at = new Date().toISOString();
+      messageCache.set(id, message);
+      if(row){ row.querySelector('.msg-text').textContent = message.body; row.classList.add('deleted'); }
+    } else {
+      if(row) row.remove();
+      messageCache.delete(id);
+    }
+    selectedMessageIds.delete(id);
   }
   clearMessageSelection();
   loadConversations();
@@ -1228,9 +1249,11 @@ async function pinSelectedMessage(){
   const id = [...selectedMessageIds][0]; if(!id) return;
   const { data, error } = await sb.rpc('pin_message', { p_message_id:id });
   if(error){ showToast('Could not pin message.'); return; }
-  const message = messageCache.get(id) || {}; messageCache.set(id, { ...message, ...(data || {}), pinned_at:new Date().toISOString() });
-  const row = $(`.msg-row[data-id="${id}"]`); if(row) row.classList.add('pinned');
-  clearMessageSelection(); showToast('Message pinned.');
+  const message = messageCache.get(id) || {};
+  const updated = { ...message, ...(data || {}) };
+  messageCache.set(id, updated);
+  const row = $(`.msg-row[data-id="${id}"]`); if(row) row.classList.toggle('pinned', !!updated.pinned_at);
+  clearMessageSelection(); showToast(updated.pinned_at ? 'Message pinned.' : 'Message unpinned.');
 }
 async function forwardSelectedMessage(){
   const id = [...selectedMessageIds][0]; if(!id) return;
@@ -1248,6 +1271,12 @@ $('#editMessageBtn').addEventListener('click', editSelectedMessage);
 $('#deleteMessageBtn').addEventListener('click', deleteSelectedMessages);
 $('#forwardMessageBtn').addEventListener('click', forwardSelectedMessage);
 $('#pinMessageBtn').addEventListener('click', pinSelectedMessage);
+$('#copyMessageBtn').addEventListener('click', async ()=>{
+  const message = messageCache.get([...selectedMessageIds][0]);
+  if(!message) return;
+  try{ await navigator.clipboard.writeText(message.body); showToast('Message copied.'); }
+  catch(e){ window.prompt('Copy message:', message.body); }
+});
 $('#clearMessageSelection').addEventListener('click', clearMessageSelection);
 
 function subscribeToMessages(conversationId){
@@ -1276,6 +1305,7 @@ function subscribeToMessages(conversationId){
         const time = row.querySelector('.msg-meta > span');
         if(time && m.edited_at && !time.querySelector('.msg-edited')) time.insertAdjacentHTML('beforeend','<span class="msg-edited">edited</span>');
         row.classList.toggle('pinned', !!m.pinned_at);
+        row.classList.toggle('deleted', !!m.deleted_at);
       }
     })
     .on('postgres_changes', { event:'DELETE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
