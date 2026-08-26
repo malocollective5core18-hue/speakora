@@ -175,7 +175,10 @@ button,input,select,textarea{font-family:inherit;}
 .chat-filter-tabs button.active{ background:var(--grad); border-color:transparent; color:#fff; }
 .favorite-toggle{border:0;background:transparent;color:var(--text-faint);cursor:pointer;padding:3px 5px;border-radius:6px}.favorite-toggle:hover{color:#ffd166;background:var(--panel-3)}.favorite-toggle.active{color:#ffd166}
 .new-chat-choice{display:flex;gap:8px;margin:12px 0}.new-chat-choice button{flex:1;border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:var(--radius-sm);padding:10px;font-weight:600;cursor:pointer}.new-chat-choice button:hover{background:var(--grad);color:#fff}
-.group-form{display:none}.group-form.show{display:block}.group-selected{font-size:12px;color:var(--text-dim);margin:8px 0}
+.group-form{display:none}.group-form.show{display:block}.group-selected{display:flex;flex-wrap:wrap;align-items:center;gap:8px;min-height:38px;margin:10px 0;color:var(--text-dim)}.group-selected.empty{font-size:12px}.group-member-chip{display:flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--border);border-radius:999px;padding:4px 8px 4px 5px;max-width:100%}.group-member-chip .avatar{width:28px;height:28px;font-size:10px}.group-member-chip-name{font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}.group-member-remove{width:22px;height:22px;border:0;border-radius:50%;background:transparent;color:var(--text-faint);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}.group-member-remove:hover{background:var(--panel-3);color:var(--danger)}
+.chat-contact-wrap{position:relative}.chat-contact-menu{display:none;position:absolute;right:0;top:44px;z-index:30;min-width:180px;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-md);padding:6px;box-shadow:var(--shadow)}.chat-contact-menu.show{display:block}.chat-contact-menu button{display:block;width:100%;border:0;background:transparent;color:var(--text);text-align:left;padding:9px;border-radius:8px;cursor:pointer;font-size:13px}.chat-contact-menu button:hover{background:var(--panel-3)}
+.convo-contact-btn{border:0;background:transparent;color:var(--text-faint);cursor:pointer;padding:4px 7px;border-radius:6px}.convo-contact-btn:hover{background:var(--panel-3);color:var(--text)}
+.convo-row-contact{position:relative;display:flex;align-items:center}.convo-row-menu{top:30px;right:0;min-width:170px}
 
 .convo-list{ flex:1; overflow-y:auto; padding:4px 8px 8px; }
 .empty-list{ text-align:center; color:var(--text-faint); font-size:13px; padding:40px 20px; line-height:1.7; }
@@ -488,6 +491,7 @@ button,input,select,textarea{font-family:inherit;}
         <button class="chat-notify-btn" id="chatNotifyBtn" title="Unread messages" aria-label="Unread messages" aria-live="polite">
           <i class="fa-regular fa-bell"></i><span class="notify-count hidden" id="notifyCount">0</span>
         </button>
+        <div class="chat-contact-wrap"><button class="icon-btn" id="chatContactBtn" title="Contact options"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="chat-contact-menu" id="chatContactMenu"><button type="button" id="viewContactBtn">View contact</button><button type="button" id="shareContactNumberBtn">Share number</button><button type="button" id="saveContactBtn">Save contact</button></div></div>
       </div>
 
       <div class="messages scroll" id="messages"></div>
@@ -521,7 +525,7 @@ button,input,select,textarea{font-family:inherit;}
     <h3>Message someone new</h3>
     <p>Type their full phone number, country code included.</p>
     <div class="new-chat-choice" id="newChatChoice"><button type="button" id="chooseNewChat">New chat</button><button type="button" id="chooseNewGroup">New group</button></div>
-    <div class="group-form" id="groupForm"><input id="groupNameInput" placeholder="Group name" style="width:100%;margin-bottom:8px"><div class="discover-row"><input type="tel" id="groupSearchInput" placeholder="Search member by phone"><button type="button" id="groupSearchBtn"><i class="fa-solid fa-magnifying-glass"></i></button></div><div class="discover-result" id="groupSearchResult"></div><div class="group-selected" id="groupMembersHint">No members selected</div><button type="button" class="primary-btn" id="createGroupBtn">Create group</button></div>
+    <div class="group-form" id="groupForm"><input id="groupNameInput" placeholder="Group name" style="width:100%;margin-bottom:8px"><div class="discover-row"><input type="search" id="groupSearchInput" placeholder="Search by name or phone" autocomplete="off"></div><div class="discover-result" id="groupSearchResult"></div><div class="group-selected" id="groupMembersHint">No members selected</div><button type="button" class="primary-btn" id="createGroupBtn">Create group</button></div>
     <div id="singleChatForm">
     <div class="discover-row">
       <input type="tel" id="discoverInput" placeholder="+254712345678">
@@ -1086,6 +1090,14 @@ function renderConvoList(filter){
           <div class="convo-preview">${escapeHtml(preview)}</div>
           <div class="convo-meta">
             <button type="button" class="favorite-toggle ${favoriteConversationIds.has(c.id)?'active':''}" title="Favorite"><i class="fa-${favoriteConversationIds.has(c.id)?'solid':'regular'} fa-star"></i></button>
+            <div class="convo-row-contact">
+              <button type="button" class="convo-contact-btn" title="Contact options" aria-label="Contact options" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
+              <div class="chat-contact-menu convo-row-menu">
+                <button type="button" data-action="view"><i class="fa-solid fa-user"></i> View contact</button>
+                <button type="button" data-action="share"><i class="fa-solid fa-share-nodes"></i> Share number</button>
+                <button type="button" data-action="save"><i class="fa-regular fa-address-card"></i> Save contact</button>
+              </div>
+            </div>
             ${other.country_code ? `<span class="lang-pill">${other.country_code}</span>` : ''}
             ${unread ? `<span class="unread">${unread}</span>` : ''}
           </div>
@@ -1093,11 +1105,46 @@ function renderConvoList(filter){
       </div>`;
     item.addEventListener('click', ()=> openConversation(c));
     item.querySelector('.favorite-toggle').addEventListener('click', e=>{ e.stopPropagation(); if(favoriteConversationIds.has(c.id)) favoriteConversationIds.delete(c.id); else favoriteConversationIds.add(c.id); saveFavorites(); renderConvoList($('#searchInput').value); });
+    const contactWrap = item.querySelector('.convo-row-contact');
+    const contactBtn = contactWrap.querySelector('.convo-contact-btn');
+    const contactMenu = contactWrap.querySelector('.convo-row-menu');
+    contactBtn.addEventListener('click', e=>{
+      e.stopPropagation();
+      document.querySelectorAll('.convo-row-menu.show').forEach(menu=>{ if(menu!==contactMenu) menu.classList.remove('show'); });
+      const open = contactMenu.classList.toggle('show');
+      contactBtn.setAttribute('aria-expanded', String(open));
+    });
+    contactMenu.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click', async e=>{
+      e.stopPropagation();
+      const p = otherParty(c); if(!p) return;
+      const action = button.dataset.action;
+      if(action === 'view'){
+        showToast(`${p.display_name||'Contact'} · ${p.phone||'No number'}${p.country_name?' · '+p.country_name:''}`);
+      } else if(action === 'share'){
+        if(!p.phone){ showToast('This contact has no phone number.'); }
+        else { try{ if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.'); }catch(err){} }
+      } else if(action === 'save'){
+        if(!p.phone){ showToast('This contact has no phone number.'); }
+        else {
+          const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`;
+          const url=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'}));
+          const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click();
+          URL.revokeObjectURL(url); showToast('Contact file created.');
+        }
+      }
+      contactMenu.classList.remove('show'); contactBtn.setAttribute('aria-expanded','false');
+    }));
     list.appendChild(item);
   });
 }
 $('#searchInput').addEventListener('input', e=> renderConvoList(e.target.value));
 $('#chatFilterTabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-filter]'); if(!b)return; activeChatFilter=b.dataset.filter; document.querySelectorAll('#chatFilterTabs button').forEach(x=>x.classList.toggle('active',x===b)); renderConvoList($('#searchInput').value); });
+document.addEventListener('click', e=>{
+  if(!e.target.closest('.convo-row-contact')){
+    document.querySelectorAll('.convo-row-menu.show').forEach(menu=>menu.classList.remove('show'));
+    document.querySelectorAll('.convo-contact-btn[aria-expanded="true"]').forEach(btn=>btn.setAttribute('aria-expanded','false'));
+  }
+});
 
 function subscribeToConversations(){
   if(conversationsChannel) sb.removeChannel(conversationsChannel);
@@ -1287,7 +1334,7 @@ async function deleteSelectedMessages(){
   for(const id of ids){
     const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
     const { error } = await sb.rpc(rpc, { p_message_id:id });
-    if(error){ showToast('Some messages could not be deleted.'); continue; }
+    if(error){ showToast(error.message || 'Some messages could not be deleted.'); continue; }
     const row = $(`.msg-row[data-id="${id}"]`);
     if(deleteForAll){
       const message = messageCache.get(id) || {};
@@ -1480,9 +1527,32 @@ $('#newChatBtn').addEventListener('click', ()=>{
 });
 $('#chooseNewChat').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='block'; $('#groupForm').classList.remove('show'); $('#discoverInput').focus(); });
 $('#chooseNewGroup').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='none'; $('#groupForm').classList.add('show'); $('#groupNameInput').focus(); });
-function renderGroupSelection(){ const h=$('#groupMembersHint'); h.textContent=selectedGroupProfiles.size ? [...selectedGroupProfiles.values()].map(p=>p.display_name||p.phone).join(' · ') : 'No members selected'; }
-async function searchGroupMember(){ const phone=normalizePhone($('#groupSearchInput').value.trim()); if(!phone)return; const {data}=await sb.from('profiles').select('*').eq('phone',phone).maybeSingle(); const box=$('#groupSearchResult'); if(!data){box.innerHTML='<div class="discover-empty">No user found.</div>';return;} box.innerHTML=`<div class="result-card"><div class="avatar sm" style="background:${avatarColor(data.id)}">${initials(data.display_name||data.phone)}</div><div class="result-info"><div class="result-name">${escapeHtml(data.display_name||'Speakora user')}</div><div class="result-sub">${data.phone}</div></div><button type="button" id="selectGroupMember">${selectedGroupProfiles.has(data.id)?'Remove':'Add'}</button></div>`; $('#selectGroupMember').onclick=()=>{ if(selectedGroupProfiles.has(data.id)) selectedGroupProfiles.delete(data.id); else selectedGroupProfiles.set(data.id,data); renderGroupSelection(); searchGroupMember(); }; }
-$('#groupSearchBtn').addEventListener('click', searchGroupMember); $('#groupSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchGroupMember();}});
+function renderGroupSelection(){
+  const h=$('#groupMembersHint');
+  if(!selectedGroupProfiles.size){
+    h.className='group-selected empty';
+    h.textContent='No members selected';
+    return;
+  }
+  h.className='group-selected';
+  h.innerHTML=[...selectedGroupProfiles.values()].map(p=>{
+    const name=p.display_name||p.phone||'Speakora user';
+    return `<div class="group-member-chip" data-selected-member="${p.id}">
+      <div class="avatar" style="background:${avatarColor(p.id)}">${initials(name)}</div>
+      <span class="group-member-chip-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
+      <button type="button" class="group-member-remove" data-remove-member="${p.id}" aria-label="Remove ${escapeHtml(name)}"><i class="fa-solid fa-xmark"></i></button>
+    </div>`;
+  }).join('');
+  h.querySelectorAll('[data-remove-member]').forEach(btn=>btn.addEventListener('click', e=>{
+    e.stopPropagation();
+    selectedGroupProfiles.delete(btn.dataset.removeMember);
+    renderGroupSelection();
+    if($('#groupSearchInput').value.trim()) searchGroupMember();
+  }));
+}
+async function searchGroupMember(){ const term=$('#groupSearchInput').value.trim(); if(!term){ $('#groupSearchResult').innerHTML=''; return; } const clean=term.replace(/[%_,]/g,''); const phoneSearch=/^[+\d\s()-]+$/.test(term); let query=sb.from('profiles').select('*'); if(!phoneSearch){ const chattedIds=conversations.map(c=>otherParty(c)).filter(Boolean).map(p=>p.id).filter(Boolean); if(!chattedIds.length){ $('#groupSearchResult').innerHTML='<div class="discover-empty">No previous contacts yet.</div>'; return; } query=query.in('id',chattedIds).ilike('display_name',`%${clean}%`); } else { query=query.ilike('phone',`%${clean}%`); } const {data}=await query.limit(8); const box=$('#groupSearchResult'); if(!data||!data.length){box.innerHTML='<div class="discover-empty">No user found.</div>';return;} box.innerHTML=data.filter(p=>p.id!==me.id).map(p=>`<div class="result-card"><div class="avatar sm" style="background:${avatarColor(p.id)}">${initials(p.display_name||p.phone)}</div><div class="result-info"><div class="result-name">${escapeHtml(p.display_name||'Speakora user')}</div><div class="result-sub">${p.phone}</div></div><button type="button" data-member-id="${p.id}">${selectedGroupProfiles.has(p.id)?'Remove':'Add'}</button></div>`).join(''); box.querySelectorAll('[data-member-id]').forEach(btn=>btn.onclick=()=>{const p=data.find(x=>x.id===btn.dataset.memberId); if(selectedGroupProfiles.has(p.id)) selectedGroupProfiles.delete(p.id); else selectedGroupProfiles.set(p.id,p); renderGroupSelection(); searchGroupMember();}); }
+let groupSearchTimer=null;
+$('#groupSearchInput').addEventListener('input',()=>{ clearTimeout(groupSearchTimer); groupSearchTimer=setTimeout(searchGroupMember,220); });
 $('#createGroupBtn').addEventListener('click', async ()=>{
   const name=$('#groupNameInput').value.trim(); const ids=[me.id,...selectedGroupProfiles.keys()];
   if(!name || ids.length<2){ showToast('Enter a group name and select at least one member.'); return; }
@@ -1495,6 +1565,12 @@ $('#chatNotifyBtn').addEventListener('click', ()=>{
   const count = Number($('#notifyCount').textContent.replace('+','')) || 0;
   showToast(count ? `${count} unread message${count === 1 ? '' : 's'}` : 'No unread messages');
 });
+$('#chatContactBtn').addEventListener('click',e=>{e.stopPropagation();$('#chatContactMenu').classList.toggle('show');});
+document.addEventListener('click',e=>{if(!e.target.closest('.chat-contact-wrap'))$('#chatContactMenu').classList.remove('show');});
+function currentContact(){ return activeConvo ? otherParty(activeConvo) : null; }
+$('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showToast(`${p.display_name||'Contact'} · ${p.phone||'No number'}${p.country_name?' · '+p.country_name:''}`); $('#chatContactMenu').classList.remove('show');});
+$('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
+$('#saveContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(a.href); showToast('Contact file created.'); $('#chatContactMenu').classList.remove('show');});
 $('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
 $('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
 
