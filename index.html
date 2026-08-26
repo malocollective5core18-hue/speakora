@@ -685,11 +685,17 @@ $('#loginForm').addEventListener('submit', async e=>{
   hideAuthMsg();
   const email = $('#loginEmail').value.trim();
   const password = $('#loginPassword').value;
+  console.log('[Speakora auth] Login attempt', { email });
   const btn = $('#loginBtn');
   btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in…';
   const { data, error } = await sb.auth.signInWithPassword({ email, password });
   btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Log in';
-  if(error){ showAuthMsg(error.message, 'error'); return; }
+  if(error){
+    console.error('[Speakora auth] Login failed', { email, status:error.status, code:error.code, message:error.message });
+    showAuthMsg(error.message, 'error');
+    return;
+  }
+  console.log('[Speakora auth] Login succeeded', { userId:data.user && data.user.id });
   await handleAuthenticated(data.session);
 });
 
@@ -702,9 +708,11 @@ $('#signupForm').addEventListener('submit', async e=>{
   if(password !== password2){ showAuthMsg("Passwords don't match.", 'error'); return; }
   const btn = $('#signupBtn');
   btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account…';
+  console.log('[Speakora auth] Signup attempt', { email });
   const { data, error } = await sb.auth.signUp({ email, password });
   btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create account';
   if(error){
+    console.error('[Speakora auth] Signup failed', { email, status:error.status, code:error.code, message:error.message });
     const rateLimited = error.status === 429 || error.code === 'over_email_send_rate_limit';
     showAuthMsg(rateLimited
       ? 'Too many signup emails were requested. Please wait and try again later, or ask the project owner to configure a custom SMTP provider.'
@@ -712,11 +720,25 @@ $('#signupForm').addEventListener('submit', async e=>{
     return;
   }
   if(!data.session){
-    // email confirmation is required by this project's auth settings
-    switchAuthTab('login');
-    showAuthMsg('Account created. Check your email to confirm it, then log in.', 'info');
+    // If confirmation is disabled, signUp can still return no session in some
+    // configurations. Try an immediate login before showing the confirmation
+    // fallback to the user.
+    console.log('[Speakora auth] Signup created account without session; attempting automatic login', { email });
+    const autoLogin = await sb.auth.signInWithPassword({ email, password });
+    if(autoLogin.error){
+      console.warn('[Speakora auth] Automatic login unavailable', {
+        email, status:autoLogin.error.status, code:autoLogin.error.code, message:autoLogin.error.message
+      });
+      // Email confirmation is required by this project's Auth settings.
+      switchAuthTab('login');
+      showAuthMsg('Account created. Check your email to confirm it, then log in.', 'info');
+      return;
+    }
+    console.log('[Speakora auth] Automatic login succeeded', { userId:autoLogin.data.user && autoLogin.data.user.id });
+    await handleAuthenticated(autoLogin.data.session);
     return;
   }
+  console.log('[Speakora auth] Signup and automatic login succeeded', { userId:data.user && data.user.id });
   await handleAuthenticated(data.session);
 });
 
@@ -773,11 +795,16 @@ $('#onboardName').addEventListener('input', e=>{
 async function handleAuthenticated(sess){
   session = sess;
   me = sess.user;
+  console.log('[Speakora auth] Loading profile', { userId:me && me.id });
   const { data: profile, error } = await sb.from('profiles').select('*').eq('id', me.id).single();
   if(error || !profile){
+    console.error('[Speakora auth] Profile load failed', {
+      userId:me && me.id, status:error && error.status, code:error && error.code, message:error && error.message
+    });
     showToast("Couldn't load your profile. Try logging in again.");
     return;
   }
+  console.log('[Speakora auth] Profile loaded', { userId:me.id, onboarded:!!profile.phone });
   myProfile = profile;
   if(!myProfile.phone){
     goToOnboarding();
@@ -1110,7 +1137,12 @@ async function runDiscover(){
   const raw = $('#discoverInput').value.trim();
   if(!raw) return;
   const phone = normalizePhone(raw);
+  const digitCount = phone.replace(/\D/g, '').length;
   const resultBox = $('#discoverResult');
+  if(digitCount < 6) {
+    resultBox.innerHTML = '';
+    return;
+  }
   resultBox.innerHTML = `<div class="discover-empty"><i class="fa-solid fa-spinner fa-spin"></i> Searching…</div>`;
 
   if(phone === myProfile.phone){
@@ -1136,6 +1168,16 @@ async function runDiscover(){
 }
 $('#discoverBtn').addEventListener('click', runDiscover);
 $('#discoverInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runDiscover(); });
+let discoverTimer = null;
+$('#discoverInput').addEventListener('input', ()=>{
+  clearTimeout(discoverTimer);
+  const digits = $('#discoverInput').value.replace(/\D/g, '');
+  if(digits.length < 6){
+    $('#discoverResult').innerHTML = '';
+    return;
+  }
+  discoverTimer = setTimeout(runDiscover, 350);
+});
 
 async function startConversationWith(otherProfile){
   const a = me.id < otherProfile.id ? me.id : otherProfile.id;
