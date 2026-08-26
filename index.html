@@ -165,11 +165,17 @@ button,input,select,textarea{font-family:inherit;}
 }
 .more-menu button:hover{ background:var(--panel-3); }
 .sb-search{ padding:2px 16px 14px; }
-.search-box{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid transparent; border-radius:999px; padding:9px 14px; transition:.15s ease; }
+.search-box{ display:flex; align-items:center; gap:10px; background:var(--panel-2); border:1px solid transparent; border-radius:999px; padding:9px 14px; transition:.15s ease; margin-bottom: 8px; }
 .search-box:focus-within{ border-color:var(--violet); background:var(--panel); }
 .search-box i{ color:var(--text-faint); font-size:13px; }
 .search-box input{ border:none; outline:none; background:transparent; color:var(--text); font-size:14px; width:100%; }
 .search-box input::placeholder{ color:var(--text-faint); }
+.chat-filter-tabs{ display:flex; gap:6px; padding:0 16px 10px; }
+.chat-filter-tabs button{ flex:1; border:1px solid var(--border); border-radius:999px; padding:7px 8px; background:var(--panel-2); color:var(--text-dim); font-size:11px; cursor:pointer; }
+.chat-filter-tabs button.active{ background:var(--grad); border-color:transparent; color:#fff; }
+.favorite-toggle{border:0;background:transparent;color:var(--text-faint);cursor:pointer;padding:3px 5px;border-radius:6px}.favorite-toggle:hover{color:#ffd166;background:var(--panel-3)}.favorite-toggle.active{color:#ffd166}
+.new-chat-choice{display:flex;gap:8px;margin:12px 0}.new-chat-choice button{flex:1;border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:var(--radius-sm);padding:10px;font-weight:600;cursor:pointer}.new-chat-choice button:hover{background:var(--grad);color:#fff}
+.group-form{display:none}.group-form.show{display:block}.group-selected{font-size:12px;color:var(--text-dim);margin:8px 0}
 
 .convo-list{ flex:1; overflow-y:auto; padding:4px 8px 8px; }
 .empty-list{ text-align:center; color:var(--text-faint); font-size:13px; padding:40px 20px; line-height:1.7; }
@@ -290,6 +296,7 @@ button,input,select,textarea{font-family:inherit;}
 .profile-modal{ position:relative; }
 .profile-avatar-large{ width:76px; height:76px; margin:0 auto 16px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#fff; font-family:var(--font-display); font-size:25px; font-weight:700; background:var(--grad); }
 .profile-readonly{ opacity:.7; cursor:not-allowed; }
+.phone-country{display:flex;justify-content:space-between;align-items:center;margin-top:5px;margin-bottom:14px; text-decoration: underline; font-size:12px;color:var(--text-faint)}.phone-country strong{color:var(--text-dim);font-weight:600}
 .share-modal{ position:relative; }
 .share-link-box{ display:flex; gap:8px; margin-top:16px; }
 .share-link-box input{ flex:1; min-width:0; background:var(--input-bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; color:var(--text-dim); font-size:12px; }
@@ -443,8 +450,10 @@ button,input,select,textarea{font-family:inherit;}
         <i class="fa-solid fa-magnifying-glass"></i>
         <input type="text" id="searchInput" placeholder="Search conversations">
       </div>
+      <div class="chat-filter-tabs" id="chatFilterTabs" role="tablist">
+        <button type="button" class="active" data-filter="all">All</button><button type="button" data-filter="normal">Normal</button><button type="button" data-filter="groups">Groups</button><button type="button" data-filter="favorites">Favorites</button>
+      </div>
     </div>
-
       <div class="convo-list scroll" id="convoList">
         <div id="convoItems"></div>
         <button class="icon-btn" id="newChatBtn" title="Message someone by phone number"><i class="fa-solid fa-comment-medical"></i></button>
@@ -511,11 +520,15 @@ button,input,select,textarea{font-family:inherit;}
     <button class="icon-btn close-modal" id="closeDiscover"><i class="fa-solid fa-xmark"></i></button>
     <h3>Message someone new</h3>
     <p>Type their full phone number, country code included.</p>
+    <div class="new-chat-choice" id="newChatChoice"><button type="button" id="chooseNewChat">New chat</button><button type="button" id="chooseNewGroup">New group</button></div>
+    <div class="group-form" id="groupForm"><input id="groupNameInput" placeholder="Group name" style="width:100%;margin-bottom:8px"><div class="discover-row"><input type="tel" id="groupSearchInput" placeholder="Search member by phone"><button type="button" id="groupSearchBtn"><i class="fa-solid fa-magnifying-glass"></i></button></div><div class="discover-result" id="groupSearchResult"></div><div class="group-selected" id="groupMembersHint">No members selected</div><button type="button" class="primary-btn" id="createGroupBtn">Create group</button></div>
+    <div id="singleChatForm">
     <div class="discover-row">
       <input type="tel" id="discoverInput" placeholder="+254712345678">
       <button id="discoverBtn"><i class="fa-solid fa-magnifying-glass"></i></button>
     </div>
     <div class="discover-result" id="discoverResult"></div>
+    </div>
   </div>
 </div>
 
@@ -528,7 +541,7 @@ button,input,select,textarea{font-family:inherit;}
     <div id="profileMsg" class="auth-msg"></div>
     <form id="profileForm">
       <div class="field"><label>Name</label><input type="text" id="profileName" required></div>
-      <div class="field"><label>Phone number</label><input type="tel" id="profilePhone" required></div>
+      <div class="field"><label>Phone number</label><input type="tel" id="profilePhone" required><div class="phone-country"><span>Country  ----</span><strong id="profileCountry">—</strong></div></div>
       <div class="field"><label>Email</label><input type="email" id="profileEmail" class="profile-readonly" readonly></div>
       <button type="submit" class="primary-btn" id="profileSaveBtn"><i class="fa-solid fa-check"></i> Save changes</button>
     </form>
@@ -710,6 +723,11 @@ let typingTimeout = null;
 let renderedMessageIds = new Set();
 let selectedMessageIds = new Set();
 let messageCache = new Map();
+let activeChatFilter = 'all';
+let favoriteConversationIds = new Set();
+let selectedGroupProfiles = new Map();
+try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora-favorites') || '[]')); }catch(e){}
+function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
 let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
 let pendingContactKey = new URLSearchParams(window.location.search).get('key');
 
@@ -737,7 +755,7 @@ function updateMessageActions(){
   $('#selectedMessageCount').textContent = `${ids.length} selected`;
   const selected = ids.map(id => messageCache.get(id)).filter(Boolean);
   $('#editMessageBtn').disabled = selected.length !== 1 || selected[0].sender_id !== me.id || !!selected[0].deleted_at;
-  $('#deleteMessageBtn').disabled = selected.length === 0 || selected.some(m => m.sender_id !== me.id);
+  $('#deleteMessageBtn').disabled = selected.length === 0;
   $('#forwardMessageBtn').disabled = selected.length !== 1;
   $('#pinMessageBtn').disabled = selected.length !== 1;
   $('#copyMessageBtn').disabled = selected.length !== 1;
@@ -1027,6 +1045,7 @@ async function loadConversations(){
 function otherParty(convo){
   return convo.user_a === me.id ? convo.b : convo.a;
 }
+function conversationTitle(convo){ return convo.is_group ? (convo.group_name || 'Group chat') : ((otherParty(convo)||{}).display_name || (otherParty(convo)||{}).phone || 'Unknown'); }
 function myUnreadField(convo){
   return convo.user_a === me.id ? 'unread_a' : 'unread_b';
 }
@@ -1036,7 +1055,10 @@ function renderConvoList(filter){
   const term = (filter||'').toLowerCase();
   const filtered = conversations.filter(c=>{
     const other = otherParty(c);
-    return !term || (other.display_name||'').toLowerCase().includes(term) || (other.phone||'').includes(term);
+    const matchesSearch = !term || (other.display_name||'').toLowerCase().includes(term) || (other.phone||'').includes(term) || (c.group_name||'').toLowerCase().includes(term);
+    const isGroup = !!c.is_group;
+    const matchesFilter = activeChatFilter==='all' || (activeChatFilter==='normal'&&!isGroup) || (activeChatFilter==='groups'&&isGroup) || (activeChatFilter==='favorites'&&favoriteConversationIds.has(c.id));
+    return matchesSearch && matchesFilter;
   });
 
   if(!filtered.length){
@@ -1054,25 +1076,28 @@ function renderConvoList(filter){
     const item = document.createElement('div');
     item.className = 'convo' + (activeConvo && activeConvo.id===c.id ? ' active' : '');
     item.innerHTML = `
-      <div class="avatar" style="background:${avatarColor(other.id)}">${initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
+      <div class="avatar" style="background:${avatarColor(c.id)}">${c.is_group ? '<i class="fa-solid fa-users"></i>' : initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
       <div class="convo-body">
         <div class="convo-top">
-          <div class="convo-name">${escapeHtml(other.display_name || other.phone || 'Unknown')}</div>
+          <div class="convo-name">${escapeHtml(conversationTitle(c))}</div>
           <div class="convo-time">${timeLabel(c.last_message_at)}</div>
         </div>
         <div class="convo-bottom">
           <div class="convo-preview">${escapeHtml(preview)}</div>
           <div class="convo-meta">
+            <button type="button" class="favorite-toggle ${favoriteConversationIds.has(c.id)?'active':''}" title="Favorite"><i class="fa-${favoriteConversationIds.has(c.id)?'solid':'regular'} fa-star"></i></button>
             ${other.country_code ? `<span class="lang-pill">${other.country_code}</span>` : ''}
             ${unread ? `<span class="unread">${unread}</span>` : ''}
           </div>
         </div>
       </div>`;
     item.addEventListener('click', ()=> openConversation(c));
+    item.querySelector('.favorite-toggle').addEventListener('click', e=>{ e.stopPropagation(); if(favoriteConversationIds.has(c.id)) favoriteConversationIds.delete(c.id); else favoriteConversationIds.add(c.id); saveFavorites(); renderConvoList($('#searchInput').value); });
     list.appendChild(item);
   });
 }
 $('#searchInput').addEventListener('input', e=> renderConvoList(e.target.value));
+$('#chatFilterTabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-filter]'); if(!b)return; activeChatFilter=b.dataset.filter; document.querySelectorAll('#chatFilterTabs button').forEach(x=>x.classList.toggle('active',x===b)); renderConvoList($('#searchInput').value); });
 
 function subscribeToConversations(){
   if(conversationsChannel) sb.removeChannel(conversationsChannel);
@@ -1256,10 +1281,9 @@ async function editSelectedMessage(){
 async function deleteSelectedMessages(){
   const ids = [...selectedMessageIds];
   if(!ids.length) return;
-  const mode = window.prompt('Type ALL to delete for everyone, or ME to delete only for you:', 'ME');
-  if(!mode) return;
-  const deleteForAll = mode.trim().toLowerCase() === 'all';
-  if(!deleteForAll && mode.trim().toLowerCase() !== 'me') return;
+  const ownOnly = ids.every(id => (messageCache.get(id)||{}).sender_id === me.id);
+  const deleteForAll = ownOnly && window.confirm('Delete this message for everyone?\n\nPress Cancel to delete it only for you.');
+  if(!deleteForAll && !window.confirm('Delete this message only for you?')) return;
   for(const id of ids){
     const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
     const { error } = await sb.rpc(rpc, { p_message_id:id });
@@ -1448,9 +1472,24 @@ document.addEventListener('click', e=>{
 /* ============ DISCOVER (find someone by phone) ============ */
 $('#newChatBtn').addEventListener('click', ()=>{
   $('#discoverScrim').classList.add('show');
+  selectedGroupProfiles.clear(); $('#groupNameInput').value=''; $('#groupSearchInput').value=''; $('#groupSearchResult').innerHTML=''; renderGroupSelection();
+  $('#newChatChoice').style.display='flex'; $('#singleChatForm').style.display='none'; $('#groupForm').classList.remove('show');
   $('#discoverInput').value = '';
   $('#discoverResult').innerHTML = '';
   $('#discoverInput').focus();
+});
+$('#chooseNewChat').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='block'; $('#groupForm').classList.remove('show'); $('#discoverInput').focus(); });
+$('#chooseNewGroup').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='none'; $('#groupForm').classList.add('show'); $('#groupNameInput').focus(); });
+function renderGroupSelection(){ const h=$('#groupMembersHint'); h.textContent=selectedGroupProfiles.size ? [...selectedGroupProfiles.values()].map(p=>p.display_name||p.phone).join(' · ') : 'No members selected'; }
+async function searchGroupMember(){ const phone=normalizePhone($('#groupSearchInput').value.trim()); if(!phone)return; const {data}=await sb.from('profiles').select('*').eq('phone',phone).maybeSingle(); const box=$('#groupSearchResult'); if(!data){box.innerHTML='<div class="discover-empty">No user found.</div>';return;} box.innerHTML=`<div class="result-card"><div class="avatar sm" style="background:${avatarColor(data.id)}">${initials(data.display_name||data.phone)}</div><div class="result-info"><div class="result-name">${escapeHtml(data.display_name||'Speakora user')}</div><div class="result-sub">${data.phone}</div></div><button type="button" id="selectGroupMember">${selectedGroupProfiles.has(data.id)?'Remove':'Add'}</button></div>`; $('#selectGroupMember').onclick=()=>{ if(selectedGroupProfiles.has(data.id)) selectedGroupProfiles.delete(data.id); else selectedGroupProfiles.set(data.id,data); renderGroupSelection(); searchGroupMember(); }; }
+$('#groupSearchBtn').addEventListener('click', searchGroupMember); $('#groupSearchInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();searchGroupMember();}});
+$('#createGroupBtn').addEventListener('click', async ()=>{
+  const name=$('#groupNameInput').value.trim(); const ids=[me.id,...selectedGroupProfiles.keys()];
+  if(!name || ids.length<2){ showToast('Enter a group name and select at least one member.'); return; }
+  if(ids.length<2){ showToast('Choose at least one other member.'); return; }
+  const {data,error}=await sb.rpc('create_group_conversation',{p_group_name:name,p_member_ids:ids});
+  if(error){ showToast('Could not create group. Run the group migration first.'); return; }
+  selectedGroupProfiles.clear(); renderGroupSelection(); $('#discoverScrim').classList.remove('show'); await loadConversations(); const fresh=conversations.find(c=>c.id===(data&&data.id))||data; if(fresh) openConversation(fresh);
 });
 $('#chatNotifyBtn').addEventListener('click', ()=>{
   const count = Number($('#notifyCount').textContent.replace('+','')) || 0;
@@ -1558,6 +1597,8 @@ $('#copyShareBtn').addEventListener('click', async ()=>{
 function openProfileModal(){
   $('#profileName').value = myProfile.display_name || '';
   $('#profilePhone').value = myProfile.phone || '';
+  const profileCountry = countryFromPhone(myProfile.phone || '');
+  $('#profileCountry').textContent = profileCountry ? profileCountry.name : 'Unknown country';
   $('#profileEmail').value = myProfile.email || me.email || '';
   $('#profileAvatarLarge').style.background = avatarColor(myProfile.id);
   $('#profileAvatarLarge').textContent = initials(myProfile.display_name || myProfile.email);
@@ -1568,6 +1609,10 @@ $('#profileBtn').addEventListener('click', ()=>{ moreMenu.classList.remove('show
 $('#closeProfile').addEventListener('click', ()=> $('#profileScrim').classList.remove('show'));
 $('#profileScrim').addEventListener('click', e=>{ if(e.target.id === 'profileScrim') $('#profileScrim').classList.remove('show'); });
 $('#profileName').addEventListener('input', e=>{ $('#profileAvatarLarge').textContent = initials(e.target.value) || '?'; });
+$('#profilePhone').addEventListener('input', e=>{
+  const country = countryFromPhone(normalizePhone(e.target.value));
+  $('#profileCountry').textContent = country ? country.name : (e.target.value.trim() ? 'Unknown country' : '—');
+});
 $('#profileForm').addEventListener('submit', async e=>{
   e.preventDefault();
   const name = $('#profileName').value.trim();
@@ -1592,6 +1637,7 @@ $('#profileForm').addEventListener('submit', async e=>{
     return;
   }
   myProfile = data;
+  $('#profileCountry').textContent = country ? country.name : 'Unknown country';
   $('#meAvatar').textContent = initials(myProfile.display_name || myProfile.email);
   $('#meName').textContent = myProfile.display_name || myProfile.email;
   const updatedCountry = countryFromPhone(myProfile.phone);
