@@ -1334,7 +1334,13 @@ async function deleteSelectedMessages(){
   for(const id of ids){
     const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
     const { error } = await sb.rpc(rpc, { p_message_id:id });
-    if(error){ showToast(error.message || 'Some messages could not be deleted.'); continue; }
+    if(error){
+      const missingDeleteRpc = error.code === 'PGRST202' || /delete_message_for_(all|me)/i.test(error.message || '');
+      showToast(missingDeleteRpc
+        ? 'Delete is not configured. Run migration_harden_rls.sql in Supabase SQL Editor.'
+        : (error.message || 'Some messages could not be deleted.'));
+      continue;
+    }
     const row = $(`.msg-row[data-id="${id}"]`);
     if(deleteForAll){
       const message = messageCache.get(id) || {};
