@@ -1282,9 +1282,10 @@ async function deleteSelectedMessages(){
 }
 async function pinSelectedMessage(){
   const id = [...selectedMessageIds][0]; if(!id) return;
-  const { data, error } = await sb.rpc('pin_message', { p_message_id:id });
-  if(error){ showToast('Could not pin message.'); return; }
   const message = messageCache.get(id) || {};
+  const rpc = message.pinned_at ? 'unpin_message' : 'pin_message';
+  const { data, error } = await sb.rpc(rpc, { p_message_id:id });
+  if(error){ showToast('Could not pin message.'); return; }
   const updated = { ...message, ...(Array.isArray(data) ? data[0] : data) };
   messageCache.set(id, updated);
   const row = $(`.msg-row[data-id="${id}"]`); if(row) row.classList.toggle('pinned', !!updated.pinned_at);
