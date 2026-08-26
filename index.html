@@ -1668,8 +1668,10 @@ $('#createGroupBtn').addEventListener('click', async ()=>{
   const name=$('#groupNameInput').value.trim(); const ids=[me.id,...selectedGroupProfiles.keys()];
   if(!name || ids.length<2){ showToast('Enter a group name and select at least one member.'); return; }
   if(ids.length<2){ showToast('Choose at least one other member.'); return; }
-  const {data,error}=await sb.rpc('create_group_conversation',{p_group_name:name,p_member_ids:ids});
-  if(error){ showToast('Could not create group. Run the group migration first.'); return; }
+  const createBtn=$('#createGroupBtn'); createBtn.disabled=true;
+  const {data,error}=await sb.rpc('create_group_conversation',{p_group_name:name,p_member_ids:[...new Set(ids)]});
+  createBtn.disabled=false;
+  if(error){ showToast(error.code==='23505' ? 'This group conflicts with an older group schema. Re-run migration_groups.sql.' : (error.message || 'Could not create group.')); return; }
   selectedGroupProfiles.clear(); renderGroupSelection(); $('#discoverScrim').classList.remove('show'); await loadConversations(); const fresh=conversations.find(c=>c.id===(data&&data.id))||data; if(fresh) openConversation(fresh);
 });
 $('#chatNotifyBtn').addEventListener('click', ()=>{
