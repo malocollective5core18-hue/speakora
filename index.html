@@ -308,6 +308,9 @@ button,input,select,textarea{font-family:inherit;}
 .share-primary{ background:var(--grad); color:#fff; }
 .share-secondary{ background:var(--panel-2); color:var(--text); }
 .delete-choice-modal{position:relative;max-width:380px}.delete-choice-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}.delete-choice-actions button{border:0;border-radius:var(--radius-sm);padding:11px 12px;font-weight:700;cursor:pointer}.delete-choice-all{background:var(--danger);color:#fff}.delete-choice-me{background:var(--grad);color:#fff}.delete-choice-cancel{background:var(--panel-2);color:var(--text)}
+.phone-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-decoration-style:dotted;padding:0;cursor:pointer;font:inherit}
+.phone-link:hover{color:var(--violet)}
+.contact-profile-card{position:relative;max-width:390px;text-align:center}.contact-profile-details{display:grid;gap:8px;margin:14px 0;text-align:left}.contact-profile-details div{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}.contact-profile-details small{display:block;color:var(--text-faint);font-size:11px;margin-bottom:3px}.contact-profile-details span{font-size:13px;word-break:break-word}.contact-profile-actions{display:flex;gap:8px;margin-top:12px}.contact-profile-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:10px;font-weight:700;cursor:pointer}.contact-profile-actions .secondary{background:var(--panel-2);color:var(--text)}
 
 /* ============ TOAST ============ */
 #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
@@ -492,7 +495,7 @@ button,input,select,textarea{font-family:inherit;}
         <button class="chat-notify-btn" id="chatNotifyBtn" title="Unread messages" aria-label="Unread messages" aria-live="polite">
           <i class="fa-regular fa-bell"></i><span class="notify-count hidden" id="notifyCount">0</span>
         </button>
-        <div class="chat-contact-wrap"><button class="icon-btn" id="chatContactBtn" title="Contact options"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="chat-contact-menu" id="chatContactMenu"><button type="button" id="viewContactBtn">View contact</button><button type="button" id="shareContactNumberBtn">Share number</button><button type="button" id="saveContactBtn">Save contact</button></div></div>
+        <div class="chat-contact-wrap"><button class="icon-btn" id="chatContactBtn" title="Contact options"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="chat-contact-menu" id="chatContactMenu"><button type="button" id="viewContactBtn">View contact</button><button type="button" id="shareContactNumberBtn">Share number</button><button type="button" id="saveContactBtn">Save contact</button><button type="button" id="deleteCurrentChatBtn"><i class="fa-solid fa-trash"></i> Delete chat</button></div></div>
       </div>
 
       <div class="messages scroll" id="messages"></div>
@@ -508,6 +511,7 @@ button,input,select,textarea{font-family:inherit;}
       </div>
 
       <div class="composer">
+        <button class="composer-btn" id="pinComposerBtn" title="Pin tools (coming soon)"><i class="fa-solid fa-thumbtack"></i></button>
         <button class="composer-btn" id="emojiBtn"><i class="fa-regular fa-face-smile"></i></button>
         <div class="input-wrap">
           <textarea id="msgInput" rows="1" placeholder="Type a message…"></textarea>
@@ -576,6 +580,25 @@ button,input,select,textarea{font-family:inherit;}
       <button type="button" class="delete-choice-me" id="deleteForMeChoice">Delete for me</button>
       <button type="button" class="delete-choice-cancel" id="cancelDeleteChoice">Cancel</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-scrim" id="contactProfileScrim">
+  <div class="discover-modal contact-profile-card">
+    <button class="icon-btn close-modal" id="closeContactProfile"><i class="fa-solid fa-xmark"></i></button>
+    <div class="profile-avatar-large" id="contactProfileAvatar">?</div>
+    <h3 id="contactProfileName">Contact</h3>
+    <p id="contactProfileSubtitle">Speakora profile</p>
+    <div class="contact-profile-details">
+      <div><small>Phone number</small><span id="contactProfilePhone">—</span></div>
+      <div><small>Country</small><span id="contactProfileCountry">—</span></div>
+    </div>
+    <div class="contact-profile-actions">
+      <button type="button" class="share-primary" id="contactChatNow"><i class="fa-solid fa-message"></i> Chat now</button>
+      <button type="button" class="secondary" id="contactCopyName"><i class="fa-regular fa-copy"></i> Copy name</button>
+      <button type="button" class="secondary" id="contactCopyPhone"><i class="fa-regular fa-copy"></i> Copy phone</button>
+    </div>
+    <button type="button" class="primary-btn" id="contactAddBtn"><i class="fa-regular fa-address-card"></i> Add contact</button>
   </div>
 </div>
 
@@ -743,9 +766,12 @@ let selectedMessageIds = new Set();
 let messageCache = new Map();
 let activeChatFilter = 'all';
 let favoriteConversationIds = new Set();
+let leftGroupIds = new Set();
 let selectedGroupProfiles = new Map();
 try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora-favorites') || '[]')); }catch(e){}
+try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-groups') || '[]')); }catch(e){}
 function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
+function saveLeftGroups(){ try{ localStorage.setItem('speakora-left-groups', JSON.stringify([...leftGroupIds])); }catch(e){} }
 let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
 let pendingContactKey = new URLSearchParams(window.location.search).get('key');
 
@@ -1055,7 +1081,9 @@ async function loadConversations(){
     .order('last_message_at', { ascending:false, nullsFirst:false });
 
   if(error){ showToast('Could not load conversations.'); return; }
-  conversations = data || [];
+  const { data: hiddenRows } = await sb.from('conversation_hidden').select('conversation_id').eq('user_id', me.id);
+  const hiddenIds = new Set((hiddenRows || []).map(row => row.conversation_id));
+  conversations = (data || []).filter(c => !hiddenIds.has(c.id));
   updateNotificationBadge();
   renderConvoList($('#searchInput').value);
 }
@@ -1066,6 +1094,35 @@ function otherParty(convo){
 function conversationTitle(convo){ return convo.is_group ? (convo.group_name || 'Group chat') : ((otherParty(convo)||{}).display_name || (otherParty(convo)||{}).phone || 'Unknown'); }
 function myUnreadField(convo){
   return convo.user_a === me.id ? 'unread_a' : 'unread_b';
+}
+let contactProfileTarget = null;
+function showContactProfile(profile){
+  if(!profile) return;
+  contactProfileTarget = profile;
+  const name = profile.display_name || profile.phone || 'Speakora user';
+  const country = profile.country_name || (countryFromPhone(profile.phone || '') || {}).name || 'Unknown country';
+  $('#contactProfileAvatar').style.background = avatarColor(profile.id || name);
+  $('#contactProfileAvatar').textContent = initials(name);
+  $('#contactProfileName').textContent = name;
+  $('#contactProfileSubtitle').textContent = profile.email || 'Speakora profile';
+  $('#contactProfilePhone').textContent = profile.phone || 'No phone number';
+  $('#contactProfileCountry').textContent = country;
+  $('#contactProfileScrim').classList.add('show');
+}
+async function copyContactField(value, label){
+  if(!value){ showToast(`No ${label.toLowerCase()} available.`); return; }
+  try{ await navigator.clipboard.writeText(value); showToast(`${label} copied.`); }
+  catch(e){ showToast(`Could not copy ${label.toLowerCase()}.`); }
+}
+async function removeConversation(c){
+  const isLeavingGroup = c.is_group && !leftGroupIds.has(c.id);
+  const rpc = isLeavingGroup ? 'leave_group_conversation' : 'delete_conversation_for_me';
+  const { error } = await sb.rpc(rpc, { p_conversation_id:c.id });
+  if(error){ showToast('This action needs the conversation actions migration.'); return; }
+  if(activeConvo && activeConvo.id === c.id){ closeChatView(); activeConvo=null; }
+  if(isLeavingGroup){ leftGroupIds.add(c.id); saveLeftGroups(); }
+  await loadConversations();
+  showToast(isLeavingGroup ? 'You left the group. Choose the menu again to delete it.' : (c.is_group ? 'Group deleted from your chats.' : 'Chat deleted.'));
 }
 
 function renderConvoList(filter){
@@ -1110,6 +1167,7 @@ function renderConvoList(filter){
                 <button type="button" data-action="view"><i class="fa-solid fa-user"></i> View contact</button>
                 <button type="button" data-action="share"><i class="fa-solid fa-share-nodes"></i> Share number</button>
                 <button type="button" data-action="save"><i class="fa-regular fa-address-card"></i> Save contact</button>
+                <button type="button" data-action="delete"><i class="fa-solid fa-trash"></i> ${c.is_group ? (leftGroupIds.has(c.id) ? 'Delete group chat' : 'Exit group') : 'Delete chat'}</button>
               </div>
             </div>
             ${other.country_code ? `<span class="lang-pill">${other.country_code}</span>` : ''}
@@ -1133,7 +1191,7 @@ function renderConvoList(filter){
       const p = otherParty(c); if(!p) return;
       const action = button.dataset.action;
       if(action === 'view'){
-        showToast(`${p.display_name||'Contact'} · ${p.phone||'No number'}${p.country_name?' · '+p.country_name:''}`);
+        showContactProfile(p);
       } else if(action === 'share'){
         if(!p.phone){ showToast('This contact has no phone number.'); }
         else { try{ if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.'); }catch(err){} }
@@ -1145,6 +1203,8 @@ function renderConvoList(filter){
           const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click();
           URL.revokeObjectURL(url); showToast('Contact file created.');
         }
+      } else if(action === 'delete'){
+        await removeConversation(c);
       }
       contactMenu.classList.remove('show'); contactBtn.setAttribute('aria-expanded','false');
     }));
@@ -1207,6 +1267,7 @@ async function openConversation(convo){
   $('#chatAvatar').style.background = avatarColor(other.id);
   $('#chatAvatar').textContent = initials(other.display_name || other.phone);
   $('#chatName').textContent = other.display_name || other.phone || 'Unknown';
+  $('#deleteCurrentChatBtn').innerHTML = `<i class="fa-solid fa-trash"></i> ${convo.is_group ? (leftGroupIds.has(convo.id) ? 'Delete group chat' : 'Exit group') : 'Delete chat'}`;
   updateChatHeaderStatus();
 
   // clear my unread counter locally + on the server, then paint the sidebar
@@ -1308,7 +1369,7 @@ function renderMessageRow(m){
   row.innerHTML = `
     <div class="bubble-wrap">
       <div class="bubble">
-        <div class="msg-text">${escapeHtml(m.body)}</div>
+        <div class="msg-text">${linkifyMessageBody(m.body)}</div>
         <div class="msg-meta">
           <span>${timeLabel(m.created_at)}${m.edited_at ? '<span class="msg-edited">edited</span>' : ''}</span>
           ${m.sender_id===me.id ? `<span class="ticks ${m.status==='read'?'read':''}"><i class="fa-solid ${ticks.replace(' read','')}"></i></span>` : ''}
@@ -1319,11 +1380,23 @@ function renderMessageRow(m){
     if(e.target.closest('button,a,input,textarea')) return;
     toggleMessageSelection(m.id);
   });
+  row.querySelectorAll('.phone-link').forEach(btn=>btn.addEventListener('click', async e=>{
+    e.stopPropagation();
+    const { data } = await sb.from('profiles').select('*').eq('phone', btn.dataset.phone).maybeSingle();
+    if(data) showContactProfile(data); else showToast('No Speakora profile found for this number.');
+  }));
   if(m.pinned_at) row.classList.add('pinned');
   if(m.deleted_at) row.classList.add('deleted');
   return row;
 }
 function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function linkifyMessageBody(body){
+  const escaped = escapeHtml(body);
+  return escaped.replace(/(\+\d[\d\s().-]{5,}\d)/g, match=>{
+    const phone = normalizePhone(match);
+    return `<button type="button" class="phone-link" data-phone="${phone}">${match}</button>`;
+  });
+}
 function scrollBottom(){ const box = $('#messages'); requestAnimationFrame(()=>{ box.scrollTop = box.scrollHeight; }); }
 
 async function editSelectedMessage(){
@@ -1606,9 +1679,17 @@ $('#chatNotifyBtn').addEventListener('click', ()=>{
 $('#chatContactBtn').addEventListener('click',e=>{e.stopPropagation();$('#chatContactMenu').classList.toggle('show');});
 document.addEventListener('click',e=>{if(!e.target.closest('.chat-contact-wrap'))$('#chatContactMenu').classList.remove('show');});
 function currentContact(){ return activeConvo ? otherParty(activeConvo) : null; }
-$('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showToast(`${p.display_name||'Contact'} · ${p.phone||'No number'}${p.country_name?' · '+p.country_name:''}`); $('#chatContactMenu').classList.remove('show');});
+$('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showContactProfile(p); $('#chatContactMenu').classList.remove('show');});
 $('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
 $('#saveContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(a.href); showToast('Contact file created.'); $('#chatContactMenu').classList.remove('show');});
+$('#deleteCurrentChatBtn').addEventListener('click',async()=>{if(!activeConvo)return; $('#chatContactMenu').classList.remove('show'); await removeConversation(activeConvo);});
+$('#closeContactProfile').addEventListener('click',()=>$('#contactProfileScrim').classList.remove('show'));
+$('#contactProfileScrim').addEventListener('click',e=>{if(e.target.id==='contactProfileScrim')$('#contactProfileScrim').classList.remove('show');});
+$('#contactCopyName').addEventListener('click',()=>copyContactField(contactProfileTarget && (contactProfileTarget.display_name||contactProfileTarget.phone),'Name'));
+$('#contactCopyPhone').addEventListener('click',()=>copyContactField(contactProfileTarget && contactProfileTarget.phone,'Phone number'));
+$('#contactChatNow').addEventListener('click',async()=>{if(!contactProfileTarget)return; $('#contactProfileScrim').classList.remove('show'); await startConversationWith(contactProfileTarget);});
+$('#contactAddBtn').addEventListener('click',()=>{const p=contactProfileTarget; if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const url=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(url); showToast('Contact file created.');});
+$(`#pinComposerBtn`).addEventListener('click',()=>showToast('Pin tools are ready for a future update.'));
 $('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
 $('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
 
