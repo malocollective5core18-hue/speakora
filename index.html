@@ -1506,7 +1506,12 @@ function renderMessageRow(m){
     ? (groupMembersCache.get(activeConvo.id) || []).find(p=>p.id===m.sender_id)
     : (activeConvo ? otherParty(activeConvo) : null));
   const senderName = sender && (sender.display_name || sender.phone) || 'User';
-  const senderAvatar = m.sender_id === me.id ? '' : `<div class="avatar msg-sender-avatar" style="background:${avatarColor(m.sender_id)}" title="${escapeHtml(senderName)}">${initials(senderName)}${onlinePeers[m.sender_id] ? '<span class="dot"></span>' : ''}</div>`;
+  // Use the same profile id as the chat header for one-to-one conversations.
+  // Group messages keep the sender's own stable profile color.
+  const senderColorSeed = activeConvo && !activeConvo.is_group
+    ? ((otherParty(activeConvo) || {}).id || m.sender_id)
+    : ((sender && sender.id) || m.sender_id);
+  const senderAvatar = m.sender_id === me.id || !activeConvo?.is_group ? '' : `<div class="avatar msg-sender-avatar" style="background:${avatarColor(senderColorSeed)}" title="${escapeHtml(senderName)}">${initials(senderName)}${onlinePeers[m.sender_id] ? '<span class="dot"></span>' : ''}</div>`;
   row.innerHTML = `
     ${senderAvatar}
     <div class="bubble-wrap">
@@ -2149,8 +2154,14 @@ async function startConversationWith(otherProfile){
 
 /* ============ BACK / THEME / LOGOUT ============ */
 $('#backBtn').addEventListener('click', ()=>{
-  if(history.state && history.state.speakoraChat) history.back();
-  else closeChatView();
+  if(!app.classList.contains('show-chat')) return;
+  closeChatView();
+  activeConvo = null;
+  // Chat entries use a temporary history state so the browser Back button
+  // also works. Clear it when the in-app arrow is used directly.
+  if(history.state && history.state.speakoraChat){
+    history.replaceState({}, '', location.href);
+  }
 });
 $('#themeBtn').addEventListener('click', ()=>{
   const cur = document.documentElement.getAttribute('data-theme');
