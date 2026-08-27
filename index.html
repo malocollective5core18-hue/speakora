@@ -1141,10 +1141,11 @@ function subscribeToRecontactRequests(){
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`requester_id=eq.${me.id}` }, payload=>{
       const req=payload.new;
       if(req.status==='rejected'){
-        try{ localStorage.setItem(recontactNoticeKey(req.conversation_id),'1'); }catch(e){}
+        try{ localStorage.setItem(recontactNoticeKey(req.conversation_id), JSON.stringify({ at:req.responded_at || new Date().toISOString() })); }catch(e){}
         showToast('Your request to restart this chat was rejected.');
         loadConversations().then(()=>{ const convo=conversations.find(c=>c.id===req.conversation_id); if(convo){ convo._recontactRejected=true; openConversation(convo); } });
       } else if(req.status==='allowed'){
+        try{ localStorage.removeItem(recontactNoticeKey(req.conversation_id)); }catch(e){}
         loadConversations().then(()=>{
           const convo=conversations.find(c=>c.id===req.conversation_id);
           if(convo && activeConvo && activeConvo.id===convo.id){
@@ -1229,9 +1230,27 @@ async function openRejectedContacts(){
 }
 
 function appendRejectedNotice(){
-  if(!activeConvo || !localStorage.getItem(recontactNoticeKey(activeConvo.id))) return;
+  if(!activeConvo) return;
+  const stored = localStorage.getItem(recontactNoticeKey(activeConvo.id));
+  if(!stored) return;
   const box=$('#messages');
-  if(box && !box.querySelector('.rejected-notice')) box.insertAdjacentHTML('beforeend','<div class="rejected-notice">Your request to restart this chat was rejected.</div>');
+  if(!box || box.querySelector('.rejected-notice')) return;
+  let rejectedAt = null;
+  try{ rejectedAt = JSON.parse(stored).at || null; }catch(e){}
+  const notice = document.createElement('div');
+  notice.className = 'rejected-notice';
+  notice.textContent = 'Your request to restart this chat was rejected.';
+  const rows = [...box.querySelectorAll('.msg-row')];
+  const afterRejection = rejectedAt && rows.find(row=>{
+    const message = messageCache.get(row.dataset.id);
+    return message && new Date(message.created_at) > new Date(rejectedAt);
+  });
+  if(afterRejection) box.insertBefore(notice, afterRejection);
+  else {
+    const firstMessage = rows[0];
+    if(firstMessage) box.insertBefore(notice, firstMessage);
+    else box.appendChild(notice);
+  }
 }
 
 async function handleContactLink(){
