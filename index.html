@@ -1278,12 +1278,13 @@ function renderConvoList(filter){
     const other = otherParty(c);
     const unread = c[myUnreadField(c)] || 0;
     const isOnline = !!onlinePeers[other.id];
+    const avatarSeed = c.is_group ? c.id : (other.id || c.id);
     const previewPrefix = c.last_message_sender_id === me.id ? 'You: ' : '';
     const preview = c.last_message_body ? previewPrefix + c.last_message_body : 'Say hello 👋';
     const item = document.createElement('div');
     item.className = 'convo' + (activeConvo && activeConvo.id===c.id ? ' active' : '');
     item.innerHTML = `
-      <div class="avatar" style="background:${avatarColor(c.id)}">${c.is_group ? '<i class="fa-solid fa-users"></i>' : initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
+      <div class="avatar" style="background:${avatarColor(avatarSeed)}">${c.is_group ? '<i class="fa-solid fa-users"></i>' : initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
       <div class="convo-body">
         <div class="convo-top">
           <div class="convo-name">${escapeHtml(conversationTitle(c))}</div>
@@ -2283,8 +2284,6 @@ $('#logoutBtn').addEventListener('click', async ()=>{
   }
 })();
 
-
-    
 })();
 </script>
 </body>
