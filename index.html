@@ -311,6 +311,8 @@ button,input,select,textarea{font-family:inherit;}
 .share-primary{ background:var(--grad); color:#fff; }
 .share-secondary{ background:var(--panel-2); color:var(--text); }
 .delete-choice-modal{position:relative;max-width:380px}.delete-choice-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}.delete-choice-actions button{border:0;border-radius:var(--radius-sm);padding:11px 12px;font-weight:700;cursor:pointer}.delete-choice-all{background:var(--danger);color:#fff}.delete-choice-me{background:var(--grad);color:#fff}.delete-choice-cancel{background:var(--panel-2);color:var(--text)}
+.recontact-modal{position:relative;max-width:390px}.recontact-actions{display:flex;gap:8px;margin-top:18px}.recontact-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:11px;font-weight:700;cursor:pointer}.recontact-allow{background:var(--grad);color:#fff}.recontact-reject{background:rgba(241,85,93,.16);color:#ff8a90;border:1px solid rgba(241,85,93,.35)!important}
+.rejected-notice{align-self:center;color:#ff8a90;background:rgba(241,85,93,.12);border:1px solid rgba(241,85,93,.3);border-radius:999px;padding:7px 12px;font-size:12px;margin:10px 0}
 .phone-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-decoration-style:dotted;padding:0;cursor:pointer;font:inherit}
 .phone-link:hover{color:var(--violet)}
 .contact-profile-card{position:relative;max-width:390px;text-align:center}.contact-profile-details{display:grid;gap:8px;margin:14px 0;text-align:left}.contact-profile-details div{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}.contact-profile-details small{display:block;color:var(--text-faint);font-size:11px;margin-bottom:3px}.contact-profile-details span{font-size:13px;word-break:break-word}.contact-profile-actions{display:flex;gap:8px;margin-top:12px}.contact-profile-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:10px;font-weight:700;cursor:pointer}.contact-profile-actions .secondary{background:var(--panel-2);color:var(--text)}
@@ -588,6 +590,17 @@ button,input,select,textarea{font-family:inherit;}
   </div>
 </div>
 
+<div class="modal-scrim" id="recontactScrim">
+  <div class="discover-modal recontact-modal">
+    <h3 id="recontactTitle">Someone wants to chat again</h3>
+    <p id="recontactText">This person deleted the chat and is trying to contact you again.</p>
+    <div class="recontact-actions">
+      <button type="button" class="recontact-allow" id="allowRecontactBtn">Allow</button>
+      <button type="button" class="recontact-reject" id="rejectRecontactBtn">Reject</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-scrim" id="contactProfileScrim">
   <div class="discover-modal contact-profile-card">
     <button class="icon-btn close-modal" id="closeContactProfile"><i class="fa-solid fa-xmark"></i></button>
@@ -789,6 +802,8 @@ let messagesChannel = null;
 let inboxMessagesChannel = null;
 let conversationsChannel = null;
 let presenceChannel = null;
+let recontactChannel = null;
+let activeRecontactRequest = null;
 let onlinePeers = {};
 let typingTimeout = null;
 let renderedMessageIds = new Set();
@@ -804,6 +819,7 @@ try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora
 try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-groups') || '[]')); }catch(e){}
 function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
 function saveLeftGroups(){ try{ localStorage.setItem('speakora-left-groups', JSON.stringify([...leftGroupIds])); }catch(e){} }
+function recontactNoticeKey(id){ return `speakora-recontact-rejected-${id}`; }
 let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
 let pendingContactKey = new URLSearchParams(window.location.search).get('key');
 
@@ -1076,6 +1092,7 @@ async function enterApp(){
   subscribeToConversations();
   subscribeToPresence();
   subscribeToInboxMessages();
+  subscribeToRecontactRequests();
   await handleContactLink();
 }
 
@@ -1090,6 +1107,39 @@ function subscribeToInboxMessages(){
       loadConversations();
     })
     .subscribe();
+}
+
+function subscribeToRecontactRequests(){
+  if(recontactChannel) sb.removeChannel(recontactChannel);
+  recontactChannel = sb.channel('recontact-' + me.id)
+    .on('postgres_changes', { event:'INSERT', schema:'public', table:'conversation_recontact_requests', filter:`recipient_id=eq.${me.id}` }, payload=>showRecontactPrompt(payload.new))
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`requester_id=eq.${me.id}` }, payload=>{
+      const req=payload.new;
+      if(req.status==='rejected'){
+        try{ localStorage.setItem(recontactNoticeKey(req.conversation_id),'1'); }catch(e){}
+        showToast('Your request to restart this chat was rejected.');
+        loadConversations().then(()=>{ const convo=conversations.find(c=>c.id===req.conversation_id); if(convo){ convo._recontactRejected=true; openConversation(convo); } });
+      } else if(req.status==='allowed'){
+        loadConversations();
+        showToast('Your chat request was allowed. You can continue chatting.');
+      }
+    }).subscribe();
+}
+
+async function showRecontactPrompt(request){
+  if(!request || request.status!=='pending') return;
+  activeRecontactRequest=request;
+  const {data}=await sb.from('profiles').select('display_name,phone').eq('id',request.requester_id).maybeSingle();
+  const name=(data && (data.display_name||data.phone)) || 'Someone';
+  $('#recontactTitle').textContent=`${name} wants to chat again`;
+  $('#recontactText').textContent=`${name} deleted this chat and is trying to contact you again. Allow to restore the latest 10 messages, or reject.`;
+  $('#recontactScrim').classList.add('show');
+}
+
+function appendRejectedNotice(){
+  if(!activeConvo || !localStorage.getItem(recontactNoticeKey(activeConvo.id))) return;
+  const box=$('#messages');
+  if(box && !box.querySelector('.rejected-notice')) box.insertAdjacentHTML('beforeend','<div class="rejected-notice">Your request to restart this chat was rejected.</div>');
 }
 
 async function handleContactLink(){
@@ -1188,13 +1238,18 @@ async function copyContactField(value, label){
 }
 async function removeConversation(c){
   const isLeavingGroup = c.is_group && !leftGroupIds.has(c.id);
-  const rpc = isLeavingGroup ? 'leave_group_conversation' : 'delete_conversation_for_me';
+  const rpc = isLeavingGroup ? 'leave_group_conversation' : 'delete_conversation_for_all';
+  let deletedForEveryone = !isLeavingGroup;
   const { error } = await sb.rpc(rpc, { p_conversation_id:c.id });
-  if(error){ showToast('This action needs the conversation actions migration.'); return; }
+  if(error && !isLeavingGroup && (error.code === 'PGRST202' || /delete_conversation_for_all/i.test(error.message || ''))){
+    const fallback = await sb.rpc('delete_conversation_for_me', { p_conversation_id:c.id });
+    if(fallback.error){ showToast('Run migration_recontact.sql in Supabase SQL Editor first.'); return; }
+    deletedForEveryone = false;
+  } else if(error){ showToast('This action needs the conversation actions migration.'); return; }
   if(activeConvo && activeConvo.id === c.id){ closeChatView(); activeConvo=null; }
   if(isLeavingGroup){ leftGroupIds.add(c.id); saveLeftGroups(); }
   await loadConversations();
-  showToast(isLeavingGroup ? 'You left the group. Choose the menu again to delete it.' : (c.is_group ? 'Group deleted from your chats.' : 'Chat deleted.'));
+  showToast(isLeavingGroup ? 'You left the group. Choose the menu again to delete it.' : (c.is_group ? 'Group deleted from your chats.' : (deletedForEveryone ? 'Chat deleted for everyone.' : 'Chat deleted for you.')));
 }
 
 function renderConvoList(filter){
@@ -1339,6 +1394,8 @@ async function openConversation(convo){
     history.pushState({ ...(history.state || {}), speakoraChat: convo.id }, '', location.href);
   }
   activeConvo = convo;
+  msgInput.disabled = !!convo._recontactRejected;
+  sendBtn.disabled = !!convo._recontactRejected;
   renderedMessageIds = new Set();
   $('#emptyState').style.display = 'none';
   $('#chatContent').style.display = 'flex';
@@ -1378,7 +1435,8 @@ async function openConversation(convo){
   }
   renderConvoList($('#searchInput').value);
 
-  await loadMessages(convo.id);
+  await loadMessages(convo.id, !!convo._recontactAllowed);
+  convo._recontactAllowed = false;
   subscribeToMessages(convo.id);
 }
 
@@ -1408,17 +1466,19 @@ function updateChatHeaderStatus(){
     : (other.country_name || '');
 }
 
-async function loadMessages(conversationId){
-  const { data, error } = await sb
+async function loadMessages(conversationId, latestOnly=false){
+  let messageQuery = sb
     .from('messages')
     .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending:true });
+    .eq('conversation_id', conversationId);
+  const { data, error } = latestOnly
+    ? await messageQuery.order('created_at', { ascending:false }).limit(10)
+    : await messageQuery.order('created_at', { ascending:true });
 
   if(error){ showToast('Could not load messages.'); return; }
   const { data: hiddenRows } = await sb.from('message_hidden').select('message_id').eq('user_id', me.id);
   const hiddenIds = new Set((hiddenRows || []).map(row => row.message_id));
-  const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id));
+  const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id)).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
 
   const box = $('#messages');
   box.innerHTML = '';
@@ -1440,6 +1500,7 @@ async function loadMessages(conversationId){
     box.appendChild(renderMessageRow(m));
   });
   renderPinnedMessages(visibleMessages);
+  appendRejectedNotice();
   scrollBottom();
 
   // mark their unread messages as read
@@ -1755,7 +1816,7 @@ sendBtn.addEventListener('click', sendMessage);
 
 async function sendMessage(){
   const text = msgInput.value.trim();
-  if(!text || !activeConvo) return;
+  if(!text || !activeConvo || activeConvo._recontactRejected) return;
   msgInput.value = '';
   sendBtn.disabled = true;
   autoGrow();
@@ -1938,6 +1999,24 @@ $('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(
 $('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
 $('#saveContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(a.href); showToast('Contact file created.'); $('#chatContactMenu').classList.remove('show');});
 $('#deleteCurrentChatBtn').addEventListener('click',async()=>{if(!activeConvo)return; $('#chatContactMenu').classList.remove('show'); await removeConversation(activeConvo);});
+async function respondToRecontact(decision){
+  const request=activeRecontactRequest;
+  if(!request) return;
+  $('#recontactScrim').classList.remove('show');
+  activeRecontactRequest=null;
+  const {data,error}=await sb.rpc('respond_recontact',{p_request_id:request.id,p_decision:decision});
+  if(error){ showToast(error.code==='PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (error.message || 'Could not respond to chat request.')); return; }
+  await loadConversations();
+  if(decision==='allowed'){
+    const convo=conversations.find(c=>c.id===request.conversation_id);
+    if(convo){ convo._recontactAllowed=true; await openConversation(convo); }
+    showToast('Chat restored with the latest 10 messages.');
+  } else {
+    showToast('Chat request rejected.');
+  }
+}
+$('#allowRecontactBtn').addEventListener('click',()=>respondToRecontact('allowed'));
+$('#rejectRecontactBtn').addEventListener('click',()=>respondToRecontact('rejected'));
 $('#closeContactProfile').addEventListener('click',()=>$('#contactProfileScrim').classList.remove('show'));
 $('#contactProfileScrim').addEventListener('click',e=>{if(e.target.id==='contactProfileScrim')$('#contactProfileScrim').classList.remove('show');});
 $('#contactCopyName').addEventListener('click',()=>copyContactField(contactProfileTarget && (contactProfileTarget.display_name||contactProfileTarget.phone),'Name'));
@@ -2142,6 +2221,15 @@ async function startConversationWith(otherProfile){
   }
 
   if(!convoRow){ showToast((startError && startError.message) || 'Could not start conversation.'); return; }
+
+  const { data: hiddenForMe } = await sb.from('conversation_hidden').select('conversation_id').eq('conversation_id', convoRow.id).eq('user_id', me.id).maybeSingle();
+  if(hiddenForMe){
+    const { error: requestError } = await sb.rpc('request_recontact', { p_conversation_id: convoRow.id });
+    if(requestError){ showToast(requestError.code === 'PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (requestError.message || 'Could not send chat request.')); return; }
+    $('#discoverScrim').classList.remove('show');
+    showToast('Chat request sent. Waiting for approval.');
+    return;
+  }
 
   $('#discoverScrim').classList.remove('show');
   $('#contactProfileScrim').classList.remove('show');
