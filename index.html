@@ -314,8 +314,8 @@ button,input,select,textarea{font-family:inherit;}
 .phone-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-decoration-style:dotted;padding:0;cursor:pointer;font:inherit}
 .phone-link:hover{color:var(--violet)}
 .contact-profile-card{position:relative;max-width:390px;text-align:center}.contact-profile-details{display:grid;gap:8px;margin:14px 0;text-align:left}.contact-profile-details div{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}.contact-profile-details small{display:block;color:var(--text-faint);font-size:11px;margin-bottom:3px}.contact-profile-details span{font-size:13px;word-break:break-word}.contact-profile-actions{display:flex;gap:8px;margin-top:12px}.contact-profile-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:10px;font-weight:700;cursor:pointer}.contact-profile-actions .secondary{background:var(--panel-2);color:var(--text)}
-.group-info-card{position:relative;max-width:460px}.group-info-initials{font-family:var(--font-display);font-size:13px;font-weight:800;color:var(--text-dim);letter-spacing:1px;margin-top:-8px}.group-info-description{color:var(--text-dim);font-size:12px;margin:6px 0 12px}.group-info-edit{display:flex;gap:7px;margin:10px 0}.group-info-edit input{flex:1;min-width:0;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px;color:var(--text)}.group-info-edit button{border:0;border-radius:var(--radius-sm);padding:0 12px;background:var(--grad);color:#fff;font-weight:700;cursor:pointer}.group-member-search{width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:9px 12px;color:var(--text);outline:none}.group-member-list{display:grid;gap:8px;margin:16px 0;max-height:42vh;overflow:auto}.group-member-row{display:flex;align-items:center;gap:10px;padding:9px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm)}.group-member-row .avatar{width:36px;height:36px;font-size:12px}.group-member-row-info{flex:1;min-width:0}.group-member-row-name{font-size:13px;font-weight:700}.group-member-row-role{font-size:11px;color:var(--violet)}.group-member-row-actions{display:flex;gap:5px}.group-member-row-actions button{border:0;border-radius:7px;padding:6px 8px;background:var(--panel-3);color:var(--text);font-size:11px;cursor:pointer}.group-member-row-actions button:hover{background:var(--violet);color:#fff}
-#groupInfoScrim{z-index:120}#groupInfoScrim .group-info-card{z-index:121}#contactProfileScrim{z-index:130}#contactProfileScrim .contact-profile-card{z-index:131}
+.group-info-card{position:relative;max-width:460px}.group-info-card #groupInfoAvatar{flex-direction:column;gap:2px}.group-info-initials{font-family:var(--font-display);font-size:12px;font-weight:800;color:#fff;letter-spacing:1px;margin-top:2px}.group-info-description{color:var(--text-dim);font-size:12px;margin:6px 0 12px}.group-info-edit{display:flex;gap:7px;margin:10px 0}.group-info-edit input{flex:1;min-width:0;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px;color:var(--text)}.group-info-edit button{border:0;border-radius:var(--radius-sm);padding:0 12px;background:var(--grad);color:#fff;font-weight:700;cursor:pointer}.group-member-search{width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:9px 12px;color:var(--text);outline:none}.group-member-list{display:grid;gap:8px;margin:16px 0;max-height:42vh;overflow:auto}.group-member-row{display:flex;align-items:center;gap:10px;padding:9px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm)}.group-member-row .avatar{width:36px;height:36px;font-size:12px}.group-member-row-info{flex:1;min-width:0}.group-member-row-name{font-size:13px;font-weight:700}.group-member-row-role{font-size:11px;color:var(--violet)}.group-member-row-actions{display:flex;gap:5px}.group-member-row-actions button{border:0;border-radius:7px;padding:6px 8px;background:var(--panel-3);color:var(--text);font-size:11px;cursor:pointer}.group-member-row-actions button:hover{background:var(--violet);color:#fff}
+#groupInfoScrim{z-index:120}#groupInfoScrim .group-info-card{z-index:121}#addMembersScrim{z-index:125}#contactProfileScrim{z-index:130}#contactProfileScrim .contact-profile-card{z-index:131}
 
 /* ============ TOAST ============ */
 #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
@@ -610,14 +610,25 @@ button,input,select,textarea{font-family:inherit;}
 <div class="modal-scrim" id="groupInfoScrim">
   <div class="discover-modal group-info-card">
     <button class="icon-btn close-modal" id="closeGroupInfo"><i class="fa-solid fa-xmark"></i></button>
-    <div class="profile-avatar-large" id="groupInfoAvatar"><i class="fa-solid fa-users"></i></div>
-    <div class="group-info-initials" id="groupInfoInitials">GR</div>
+    <div class="profile-avatar-large" id="groupInfoAvatar"><i class="fa-solid fa-users"></i><span class="group-info-initials" id="groupInfoInitials">GR</span></div>
     <h3 id="groupInfoName">Group chat</h3>
     <p id="groupInfoSummary">Group information</p>
     <div class="group-info-description" id="groupInfoDescription">No group description.</div>
-    <div class="group-info-edit hidden" id="groupInfoEdit"><input id="groupInfoNameInput" placeholder="Group name"><button type="button" id="saveGroupInfo">Save</button></div>
+    <div class="group-info-edit hidden" id="groupInfoEdit"><input id="groupInfoNameInput" placeholder="Group name"><select id="groupMemberPermission" title="Who can add members"><option value="admin">Only admins can add members</option><option value="all">All members can add members</option></select><button type="button" id="saveGroupInfo">Save</button></div>
     <input class="group-member-search" id="groupMemberSearch" placeholder="Search members" autocomplete="off">
     <div class="group-member-list" id="groupMemberList"></div>
+  </div>
+</div>
+
+<div class="modal-scrim" id="addMembersScrim">
+  <div class="discover-modal" style="position:relative;max-width:420px;">
+    <button class="icon-btn close-modal" id="closeAddMembers"><i class="fa-solid fa-xmark"></i></button>
+    <h3>Add members</h3>
+    <p>Search your contacts and select people to add to this group.</p>
+    <div class="discover-row"><input type="search" id="addMemberSearchInput" placeholder="Search by name or phone" autocomplete="off"></div>
+    <div class="discover-result" id="addMemberSearchResult"></div>
+    <div class="group-selected" id="addMembersSelected">No members selected</div>
+    <button type="button" class="primary-btn" id="confirmAddMembers"><i class="fa-solid fa-user-plus"></i> Add selected members</button>
   </div>
 </div>
 
@@ -787,6 +798,7 @@ let activeChatFilter = 'all';
 let favoriteConversationIds = new Set();
 let leftGroupIds = new Set();
 let selectedGroupProfiles = new Map();
+let addMemberProfiles = new Map();
 let groupMembersCache = new Map();
 try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora-favorites') || '[]')); }catch(e){}
 try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-groups') || '[]')); }catch(e){}
@@ -1140,6 +1152,7 @@ function renderGroupInfo(convo, members){
   $('#groupInfoDescription').textContent = convo.group_description || 'No group description.';
   $('#groupInfoEdit').classList.toggle('hidden', !isAdmin);
   $('#groupInfoNameInput').value = convo.group_name || '';
+  $('#groupMemberPermission').value = convo.members_can_add ? 'all' : 'admin';
   $('#groupMemberList').innerHTML = visibleMembers.map(member=>{
     const name = member.display_name || member.phone || 'Speakora user';
     const admin = !!member.is_admin;
@@ -1334,6 +1347,7 @@ async function openConversation(convo){
   const other = otherParty(convo) || {};
   if(convo.is_group){
     const members = await loadGroupMembers(convo.id);
+    const canAddMembers = !!convo.members_can_add || members.some(m=>m.id===me.id && m.is_admin);
     $('#chatAvatar').style.background = avatarColor(convo.id);
     $('#chatAvatar').innerHTML = '<i class="fa-solid fa-users"></i>';
     $('#chatName').textContent = convo.group_name || 'Group chat';
@@ -1342,7 +1356,7 @@ async function openConversation(convo){
     $('#shareContactNumberBtn').classList.add('hidden');
     $('#saveContactBtn').classList.add('hidden');
     $('#groupInfoBtn').classList.remove('hidden');
-    $('#groupAddMemberBtn').classList.remove('hidden');
+    $('#groupAddMemberBtn').classList.toggle('hidden', !canAddMembers);
   } else {
     $('#chatAvatar').style.background = avatarColor(other.id || convo.id);
     $('#chatAvatar').textContent = initials(other.display_name || other.phone);
@@ -1843,22 +1857,63 @@ $('#groupInfoBtn').addEventListener('click',async()=>{
   renderGroupInfo(activeConvo, members);
   $('#chatContactMenu').classList.remove('show');
 });
+function renderAddMemberSelection(){
+  const box=$('#addMembersSelected');
+  if(!addMemberProfiles.size){ box.className='group-selected empty'; box.textContent='No members selected'; return; }
+  box.className='group-selected';
+  box.innerHTML=[...addMemberProfiles.values()].map(p=>{ const name=p.display_name||p.phone||'Speakora user'; return `<div class="group-member-chip"><div class="avatar" style="background:${avatarColor(p.id)}">${initials(name)}</div><span class="group-member-chip-name">${escapeHtml(name)}</span><button type="button" class="group-member-remove" data-remove-add-member="${p.id}" aria-label="Remove ${escapeHtml(name)}"><i class="fa-solid fa-xmark"></i></button></div>`; }).join('');
+  box.querySelectorAll('[data-remove-add-member]').forEach(btn=>btn.addEventListener('click',()=>{ addMemberProfiles.delete(btn.dataset.removeAddMember); renderAddMemberSelection(); searchAddMembers(); }));
+}
+async function searchAddMembers(){
+  if(!activeConvo || !activeConvo.is_group) return;
+  const term=$('#addMemberSearchInput').value.trim();
+  const box=$('#addMemberSearchResult');
+  if(!term){ box.innerHTML=''; return; }
+  const existing=new Set((groupMembersCache.get(activeConvo.id)||[]).map(m=>m.id));
+  const clean=term.replace(/[%_,]/g,''); const phoneSearch=/^[+\d\s()-]+$/.test(term);
+  let query=sb.from('profiles').select('*');
+  if(phoneSearch) query=query.ilike('phone',`%${clean}%`);
+  else { const ids=conversations.map(c=>otherParty(c)).filter(Boolean).map(p=>p.id).filter(Boolean); if(!ids.length){box.innerHTML='<div class="discover-empty">No previous contacts yet.</div>';return;} query=query.in('id',ids).ilike('display_name',`%${clean}%`); }
+  const {data}=await query.limit(12);
+  const rows=(data||[]).filter(p=>p.id!==me.id&&!existing.has(p.id));
+  if(!rows.length){box.innerHTML='<div class="discover-empty">No available contact found.</div>';return;}
+  box.innerHTML=rows.map(p=>{const name=p.display_name||p.phone||'Speakora user'; return `<div class="result-card"><div class="avatar sm" style="background:${avatarColor(p.id)}">${initials(name)}</div><div class="result-info"><div class="result-name">${escapeHtml(name)}</div><div class="result-sub">${escapeHtml(p.phone||'')}</div></div><button type="button" data-add-member-id="${p.id}">${addMemberProfiles.has(p.id)?'Remove':'Add'}</button></div>`;}).join('');
+  box.querySelectorAll('[data-add-member-id]').forEach(btn=>btn.addEventListener('click',()=>{const p=rows.find(x=>x.id===btn.dataset.addMemberId); if(addMemberProfiles.has(p.id)) addMemberProfiles.delete(p.id); else addMemberProfiles.set(p.id,p); renderAddMemberSelection(); searchAddMembers();}));
+}
+let addMemberSearchTimer=null;
+$('#addMemberSearchInput').addEventListener('input',()=>{ clearTimeout(addMemberSearchTimer); addMemberSearchTimer=setTimeout(searchAddMembers,220); });
 $('#groupMemberSearch').addEventListener('input',()=>{ if(activeConvo && activeConvo.is_group) renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]); });
 $('#saveGroupInfo').addEventListener('click',async()=>{
   if(!activeConvo || !activeConvo.is_group) return;
   const name=$('#groupInfoNameInput').value.trim();
   if(!name){ showToast('Enter a group name.'); return; }
-  const { data, error } = await sb.rpc('group_update_details',{p_conversation_id:activeConvo.id,p_group_name:name,p_group_description:$('#groupInfoDescription').textContent==='No group description.'?'':$('#groupInfoDescription').textContent});
+  const { data, error } = await sb.rpc('group_update_details',{p_conversation_id:activeConvo.id,p_group_name:name,p_group_description:$('#groupInfoDescription').textContent==='No group description.'?'':$('#groupInfoDescription').textContent,p_members_can_add:$('#groupMemberPermission').value==='all'});
   if(error){ showToast(error.message || 'Could not update group.'); return; }
-  activeConvo = { ...activeConvo, ...(data || {}), group_name:name };
+  activeConvo = { ...activeConvo, ...(data || {}), group_name:name, members_can_add:$('#groupMemberPermission').value==='all' };
   renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]);
   $('#chatName').textContent = name;
   showToast('Group details updated.');
 });
 $('#groupAddMemberBtn').addEventListener('click',()=>{
-  showToast('To add members, use the group member tools in the next update.');
+  if(!activeConvo || !activeConvo.is_group) return;
+  addMemberProfiles.clear(); renderAddMemberSelection(); $('#addMemberSearchInput').value=''; $('#addMemberSearchResult').innerHTML='';
+  $('#addMembersScrim').classList.add('show');
   $('#chatContactMenu').classList.remove('show');
 });
+$('#confirmAddMembers').addEventListener('click',async()=>{
+  if(!activeConvo || !addMemberProfiles.size){ showToast('Select at least one member.'); return; }
+  const ids=[...addMemberProfiles.keys()];
+  const results=await Promise.all(ids.map(id=>sb.rpc('group_add_member',{p_conversation_id:activeConvo.id,p_user_id:id})));
+  const failed=results.find(r=>r.error);
+  if(failed){ showToast(failed.error.message || 'Could not add members.'); return; }
+  $('#addMembersScrim').classList.remove('show');
+  addMemberProfiles.clear();
+  const members=await loadGroupMembers(activeConvo.id);
+  renderGroupInfo(activeConvo,members); updateChatHeaderStatus();
+  showToast(`${ids.length} member${ids.length===1?'':'s'} added.`);
+});
+$('#closeAddMembers').addEventListener('click',()=>$('#addMembersScrim').classList.remove('show'));
+$('#addMembersScrim').addEventListener('click',e=>{if(e.target.id==='addMembersScrim')$('#addMembersScrim').classList.remove('show');});
 function currentContact(){ return activeConvo ? otherParty(activeConvo) : null; }
 $('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showContactProfile(p); $('#chatContactMenu').classList.remove('show');});
 $('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
