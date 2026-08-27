@@ -832,6 +832,9 @@ try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-group
 function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
 function saveLeftGroups(){ try{ localStorage.setItem('speakora-left-groups', JSON.stringify([...leftGroupIds])); }catch(e){} }
 function recontactNoticeKey(id){ return `speakora-recontact-rejected-${id}`; }
+function isRejectedConversation(convo){
+  return !!(convo && (convo._recontactRejected || localStorage.getItem(recontactNoticeKey(convo.id))));
+}
 let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
 let pendingContactKey = new URLSearchParams(window.location.search).get('key');
 
@@ -847,6 +850,7 @@ function updateNotificationBadge(){
     // Messages in the conversation currently on screen are being read, even
     // if the database counter has not finished updating yet.
     if(activeConvo && convo.id === activeConvo.id) return sum;
+    if(isRejectedConversation(convo)) return sum;
     return sum + (convo[myUnreadField(convo)] || 0);
   }, 0);
   const badge = $('#notifyCount');
@@ -1359,7 +1363,7 @@ function renderConvoList(filter){
   list.innerHTML = '';
   filtered.forEach(c=>{
     const other = otherParty(c);
-    const unread = c[myUnreadField(c)] || 0;
+    const unread = isRejectedConversation(c) ? 0 : (c[myUnreadField(c)] || 0);
     const isOnline = !!onlinePeers[other.id];
     const avatarSeed = c.is_group ? c.id : (other.id || c.id);
     const previewPrefix = c.last_message_sender_id === me.id ? 'You: ' : '';
@@ -2374,8 +2378,6 @@ $('#logoutBtn').addEventListener('click', async ()=>{
   location.reload();
 });
 
-
-  
 /* ============ BOOT ============ */
 (async function boot(){
   const { data } = await sb.auth.getSession();
