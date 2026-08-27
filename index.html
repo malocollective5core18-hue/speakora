@@ -186,6 +186,7 @@ button,input,select,textarea{font-family:inherit;}
 .convo:hover{ background:var(--panel-2); }
 .convo.active{ background:var(--grad-soft); border-color:rgba(124,79,234,.35); }
 .avatar{ width:46px; height:46px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:15px; color:#fff; position:relative; }
+.msg-sender-avatar{width:30px;height:30px;font-size:10px;margin-bottom:2px}.msg-sender-avatar .dot{width:9px;height:9px;border-width:2px}
 .avatar.sm{ width:36px; height:36px; font-size:13px; }
 .avatar .dot{ position:absolute; right:-1px; bottom:-1px; width:12px; height:12px; border-radius:50%; background:var(--online); border:2.5px solid var(--panel); }
 .convo-body{ min-width:0; flex:1; }
@@ -222,7 +223,9 @@ button,input,select,textarea{font-family:inherit;}
 .chat-status .dot-online{ width:7px; height:7px; border-radius:50%; background:var(--online); }
 .chat-status.typing{ color:var(--violet); font-style:italic; }
 
-.messages{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; padding:22px 6% 10px; display:flex; flex-direction:column; gap:2px; }
+.messages{ flex:1; min-height:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; padding:22px 6% 10px; display:flex; flex-direction:column; gap:2px; }
+.message-search-bar{position:sticky;top:0;z-index:6;display:none;align-items:center;gap:8px;max-width:520px;width:92%;margin:0 auto 10px;padding:7px 10px;background:var(--panel);border:1px solid var(--violet);border-radius:999px;box-shadow:var(--shadow)}.message-search-bar.show{display:flex}.message-search-bar input{flex:1;border:0;outline:0;background:transparent;color:var(--text);font-size:13px}.message-search-bar i{color:var(--text-faint)}.message-search-close{border:0;background:transparent;color:var(--text-dim);cursor:pointer;font-size:14px}
+.message-search-hit{background:#ffd166;color:#241733;border-radius:3px;padding:0 2px}
 .pinned-bar{ position:sticky; top:0; z-index:4; display:none; flex-direction:column; gap:4px; padding:8px 10px; margin:0 0 8px; background:color-mix(in srgb, var(--panel) 94%, transparent); border:1px solid var(--border); border-radius:var(--radius-md); box-shadow:var(--shadow); backdrop-filter:blur(8px); }
 .pinned-bar.show{ display:flex; }
 .pinned-heading{ font-size:11px; font-weight:700; color:var(--violet); text-transform:uppercase; letter-spacing:.5px; }
@@ -239,7 +242,7 @@ button,input,select,textarea{font-family:inherit;}
 .msg-row.deleted .msg-text{ font-style:italic; opacity:.7; }
 .msg-edited{ font-size:10px; opacity:.75; margin-left:4px; }
 .date-chip{ align-self:center; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); background:var(--panel-2); padding:5px 12px; border-radius:999px; margin:14px 0 18px; }
-.msg-row{ display:flex; margin:3px 0; max-width:100%; }
+.msg-row{ display:flex; align-items:flex-end; gap:7px; margin:3px 0; max-width:100%; }
 .msg-row.me{ justify-content:flex-end; }
 .msg-row.them{ justify-content:flex-start; }
 .bubble-wrap{ max-width:62%; position:relative; }
@@ -311,6 +314,8 @@ button,input,select,textarea{font-family:inherit;}
 .phone-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-decoration-style:dotted;padding:0;cursor:pointer;font:inherit}
 .phone-link:hover{color:var(--violet)}
 .contact-profile-card{position:relative;max-width:390px;text-align:center}.contact-profile-details{display:grid;gap:8px;margin:14px 0;text-align:left}.contact-profile-details div{background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px}.contact-profile-details small{display:block;color:var(--text-faint);font-size:11px;margin-bottom:3px}.contact-profile-details span{font-size:13px;word-break:break-word}.contact-profile-actions{display:flex;gap:8px;margin-top:12px}.contact-profile-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:10px;font-weight:700;cursor:pointer}.contact-profile-actions .secondary{background:var(--panel-2);color:var(--text)}
+.group-info-card{position:relative;max-width:460px}.group-info-initials{font-family:var(--font-display);font-size:13px;font-weight:800;color:var(--text-dim);letter-spacing:1px;margin-top:-8px}.group-info-description{color:var(--text-dim);font-size:12px;margin:6px 0 12px}.group-info-edit{display:flex;gap:7px;margin:10px 0}.group-info-edit input{flex:1;min-width:0;background:var(--input-bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px;color:var(--text)}.group-info-edit button{border:0;border-radius:var(--radius-sm);padding:0 12px;background:var(--grad);color:#fff;font-weight:700;cursor:pointer}.group-member-search{width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:999px;padding:9px 12px;color:var(--text);outline:none}.group-member-list{display:grid;gap:8px;margin:16px 0;max-height:42vh;overflow:auto}.group-member-row{display:flex;align-items:center;gap:10px;padding:9px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm)}.group-member-row .avatar{width:36px;height:36px;font-size:12px}.group-member-row-info{flex:1;min-width:0}.group-member-row-name{font-size:13px;font-weight:700}.group-member-row-role{font-size:11px;color:var(--violet)}.group-member-row-actions{display:flex;gap:5px}.group-member-row-actions button{border:0;border-radius:7px;padding:6px 8px;background:var(--panel-3);color:var(--text);font-size:11px;cursor:pointer}.group-member-row-actions button:hover{background:var(--violet);color:#fff}
+#groupInfoScrim{z-index:120}#groupInfoScrim .group-info-card{z-index:121}#contactProfileScrim{z-index:130}#contactProfileScrim .contact-profile-card{z-index:131}
 
 /* ============ TOAST ============ */
 #toast{ position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px); background:var(--panel); border:1px solid var(--border); color:var(--text); padding:12px 20px; border-radius:999px; box-shadow:var(--shadow); font-size:13.5px; z-index:200; opacity:0; pointer-events:none; transition:.25s ease; }
@@ -495,10 +500,10 @@ button,input,select,textarea{font-family:inherit;}
         <button class="chat-notify-btn" id="chatNotifyBtn" title="Unread messages" aria-label="Unread messages" aria-live="polite">
           <i class="fa-regular fa-bell"></i><span class="notify-count hidden" id="notifyCount">0</span>
         </button>
-        <div class="chat-contact-wrap"><button class="icon-btn" id="chatContactBtn" title="Contact options"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="chat-contact-menu" id="chatContactMenu"><button type="button" id="viewContactBtn">View contact</button><button type="button" id="shareContactNumberBtn">Share number</button><button type="button" id="saveContactBtn">Save contact</button><button type="button" id="deleteCurrentChatBtn"><i class="fa-solid fa-trash"></i> Delete chat</button></div></div>
+        <div class="chat-contact-wrap"><button class="icon-btn" id="chatContactBtn" title="Contact options"><i class="fa-solid fa-ellipsis-vertical"></i></button><div class="chat-contact-menu" id="chatContactMenu"><button type="button" id="searchMessagesBtn"><i class="fa-solid fa-magnifying-glass"></i> Search messages</button><button type="button" id="viewContactBtn">View contact</button><button type="button" id="shareContactNumberBtn">Share number</button><button type="button" id="saveContactBtn">Save contact</button><button type="button" id="groupInfoBtn" class="hidden">Group info</button><button type="button" id="groupAddMemberBtn" class="hidden">Add members</button><button type="button" id="deleteCurrentChatBtn"><i class="fa-solid fa-trash"></i> Delete chat</button></div></div>
       </div>
 
-      <div class="messages scroll" id="messages"></div>
+      <div class="messages scroll" id="messages"><div class="message-search-bar" id="messageSearchBar"><i class="fa-solid fa-magnifying-glass"></i><input id="messageSearchInput" type="search" placeholder="Search messages…" autocomplete="off"><button type="button" class="message-search-close" id="closeMessageSearch" aria-label="Close message search"><i class="fa-solid fa-xmark"></i></button></div></div>
 
       <div class="message-actions hidden" id="messageActions">
         <span id="selectedMessageCount">0 selected</span>
@@ -599,6 +604,20 @@ button,input,select,textarea{font-family:inherit;}
       <button type="button" class="secondary" id="contactCopyPhone"><i class="fa-regular fa-copy"></i> Copy phone</button>
     </div>
     <button type="button" class="primary-btn" id="contactAddBtn"><i class="fa-regular fa-address-card"></i> Add contact</button>
+  </div>
+</div>
+
+<div class="modal-scrim" id="groupInfoScrim">
+  <div class="discover-modal group-info-card">
+    <button class="icon-btn close-modal" id="closeGroupInfo"><i class="fa-solid fa-xmark"></i></button>
+    <div class="profile-avatar-large" id="groupInfoAvatar"><i class="fa-solid fa-users"></i></div>
+    <div class="group-info-initials" id="groupInfoInitials">GR</div>
+    <h3 id="groupInfoName">Group chat</h3>
+    <p id="groupInfoSummary">Group information</p>
+    <div class="group-info-description" id="groupInfoDescription">No group description.</div>
+    <div class="group-info-edit hidden" id="groupInfoEdit"><input id="groupInfoNameInput" placeholder="Group name"><button type="button" id="saveGroupInfo">Save</button></div>
+    <input class="group-member-search" id="groupMemberSearch" placeholder="Search members" autocomplete="off">
+    <div class="group-member-list" id="groupMemberList"></div>
   </div>
 </div>
 
@@ -768,6 +787,7 @@ let activeChatFilter = 'all';
 let favoriteConversationIds = new Set();
 let leftGroupIds = new Set();
 let selectedGroupProfiles = new Map();
+let groupMembersCache = new Map();
 try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora-favorites') || '[]')); }catch(e){}
 try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-groups') || '[]')); }catch(e){}
 function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
@@ -832,7 +852,7 @@ function initials(name){
   return name.split(' ').map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
 }
 function avatarColor(seed){
-  const colors = ['#E23A9C','#7C4FEA','#4A63F0','#E2703A','#39B0D9','#39D98A','#D93974'];
+  const colors = ['#E23A9C','#7C4FEA','#4A63F0','#E2703A','#39B0D9','#39D98A','#D93974','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#06B6D4','#84CC16','#F97316','#EC4899','#6366F1'];
   let h = 0; for(let i=0;i<(seed||'').length;i++) h = (h*31 + seed.charCodeAt(i)) % colors.length;
   return colors[Math.abs(h)];
 }
@@ -1109,6 +1129,45 @@ function showContactProfile(profile){
   $('#contactProfileCountry').textContent = country;
   $('#contactProfileScrim').classList.add('show');
 }
+function renderGroupInfo(convo, members){
+  const isAdmin = (members || []).some(m => m.id === me.id && m.is_admin);
+  const query = ($('#groupMemberSearch') && $('#groupMemberSearch').value || '').trim().toLowerCase();
+  const visibleMembers = (members || []).filter(m=>!query || (m.display_name||'').toLowerCase().includes(query) || (m.phone||'').includes(query));
+  $('#groupInfoAvatar').style.background = avatarColor(convo.id);
+  $('#groupInfoInitials').textContent = initials(convo.group_name || 'Group');
+  $('#groupInfoName').textContent = convo.group_name || 'Group chat';
+  $('#groupInfoSummary').textContent = `${members.length} member${members.length===1?'':'s'} · ${isAdmin ? 'You are an admin' : 'You are a member'}`;
+  $('#groupInfoDescription').textContent = convo.group_description || 'No group description.';
+  $('#groupInfoEdit').classList.toggle('hidden', !isAdmin);
+  $('#groupInfoNameInput').value = convo.group_name || '';
+  $('#groupMemberList').innerHTML = visibleMembers.map(member=>{
+    const name = member.display_name || member.phone || 'Speakora user';
+    const admin = !!member.is_admin;
+    const controls = isAdmin && member.id !== me.id
+      ? `<div class="group-member-row-actions"><button type="button" data-group-action="admin" data-user-id="${member.id}" data-admin="${admin}">${admin?'Remove admin':'Make admin'}</button><button type="button" data-group-action="remove" data-user-id="${member.id}">Remove</button></div>` : '';
+    return `<div class="group-member-row" data-member-id="${member.id}" role="button" tabindex="0"><div class="avatar" style="background:${avatarColor(member.id)}">${initials(name)}</div><div class="group-member-row-info"><div class="group-member-row-name">${escapeHtml(name)}${member.id===me.id?' (You)':''}</div><div class="group-member-row-role">${admin?'Admin':'Member'}</div></div>${controls}</div>`;
+  }).join('');
+  $('#groupMemberList').querySelectorAll('.group-member-row').forEach(row=>{
+    const openMember=()=>{ const member=(members||[]).find(p=>p.id===row.dataset.memberId); if(member) showContactProfile(member); };
+    row.addEventListener('click',e=>{ if(e.target.closest('.group-member-row-actions')) return; openMember(); });
+    row.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openMember();} });
+  });
+  $('#groupMemberList').querySelectorAll('[data-group-action]').forEach(btn=>btn.addEventListener('click', async e=>{
+    e.stopPropagation();
+    const action = btn.dataset.groupAction;
+    const uid = btn.dataset.userId;
+    const rpc = action === 'remove' ? 'group_remove_member' : 'group_set_admin';
+    const params = action === 'remove'
+      ? { p_conversation_id: convo.id, p_user_id: uid }
+      : { p_conversation_id: convo.id, p_user_id: uid, p_is_admin: btn.dataset.admin !== 'true' };
+    const { error } = await sb.rpc(rpc, params);
+    if(error){ showToast(error.message || 'Group action failed.'); return; }
+    const refreshed = await loadGroupMembers(convo.id);
+    renderGroupInfo(convo, refreshed);
+    showToast(action === 'remove' ? 'Member removed.' : 'Admin permissions updated.');
+  }));
+  $('#groupInfoScrim').classList.add('show');
+}
 async function copyContactField(value, label){
   if(!value){ showToast(`No ${label.toLowerCase()} available.`); return; }
   try{ await navigator.clipboard.writeText(value); showToast(`${label} copied.`); }
@@ -1250,6 +1309,15 @@ function subscribeToPresence(){
   });
 }
 
+async function loadGroupMembers(conversationId){
+  const { data, error } = await sb.from('conversation_members')
+    .select('user_id,is_admin,profiles(*)').eq('conversation_id', conversationId);
+  if(error) return [];
+  const members = (data || []).map(row => ({ ...(row.profiles || { id: row.user_id }), is_admin: !!row.is_admin })).filter(Boolean);
+  groupMembersCache.set(conversationId, members);
+  return members;
+}
+
 /* ============ ACTIVE CONVERSATION ============ */
 async function openConversation(convo){
   // Add one browser-history step when entering a chat so Back returns to the
@@ -1263,10 +1331,28 @@ async function openConversation(convo){
   $('#chatContent').style.display = 'flex';
   app.classList.add('show-chat');
 
-  const other = otherParty(convo);
-  $('#chatAvatar').style.background = avatarColor(other.id);
-  $('#chatAvatar').textContent = initials(other.display_name || other.phone);
-  $('#chatName').textContent = other.display_name || other.phone || 'Unknown';
+  const other = otherParty(convo) || {};
+  if(convo.is_group){
+    const members = await loadGroupMembers(convo.id);
+    $('#chatAvatar').style.background = avatarColor(convo.id);
+    $('#chatAvatar').innerHTML = '<i class="fa-solid fa-users"></i>';
+    $('#chatName').textContent = convo.group_name || 'Group chat';
+    $('#chatStatus').textContent = `${members.length || 0} member${members.length === 1 ? '' : 's'}`;
+    $('#viewContactBtn').classList.add('hidden');
+    $('#shareContactNumberBtn').classList.add('hidden');
+    $('#saveContactBtn').classList.add('hidden');
+    $('#groupInfoBtn').classList.remove('hidden');
+    $('#groupAddMemberBtn').classList.remove('hidden');
+  } else {
+    $('#chatAvatar').style.background = avatarColor(other.id || convo.id);
+    $('#chatAvatar').textContent = initials(other.display_name || other.phone);
+    $('#chatName').textContent = other.display_name || other.phone || 'Unknown';
+    $('#viewContactBtn').classList.remove('hidden');
+    $('#shareContactNumberBtn').classList.remove('hidden');
+    $('#saveContactBtn').classList.remove('hidden');
+    $('#groupInfoBtn').classList.add('hidden');
+    $('#groupAddMemberBtn').classList.add('hidden');
+  }
   $('#deleteCurrentChatBtn').innerHTML = `<i class="fa-solid fa-trash"></i> ${convo.is_group ? (leftGroupIds.has(convo.id) ? 'Delete group chat' : 'Exit group') : 'Delete chat'}`;
   updateChatHeaderStatus();
 
@@ -1294,6 +1380,12 @@ window.addEventListener('popstate', ()=>{
 
 function updateChatHeaderStatus(){
   if(!activeConvo) return;
+  if(activeConvo.is_group){
+    const members = groupMembersCache.get(activeConvo.id) || [];
+    $('#chatStatus').classList.remove('typing');
+    $('#chatStatus').textContent = `${members.length || 0} member${members.length === 1 ? '' : 's'}`;
+    return;
+  }
   const other = otherParty(activeConvo);
   const isOnline = !!onlinePeers[other.id];
   const country = other.country_name ? ` · ${other.country_name}` : '';
@@ -1316,6 +1408,8 @@ async function loadMessages(conversationId){
 
   const box = $('#messages');
   box.innerHTML = '';
+  box.insertAdjacentHTML('afterbegin','<div class="message-search-bar" id="messageSearchBar"><i class="fa-solid fa-magnifying-glass"></i><input id="messageSearchInput" type="search" placeholder="Search messages…" autocomplete="off"><button type="button" class="message-search-close" id="closeMessageSearch" aria-label="Close message search"><i class="fa-solid fa-xmark"></i></button></div>');
+  bindMessageSearch();
   messageCache.clear();
   clearMessageSelection();
   const pinnedBar = document.createElement('div');
@@ -1339,6 +1433,34 @@ async function loadMessages(conversationId){
   if(unreadIncoming.length){
     sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
   }
+}
+
+function bindMessageSearch(){
+  const input=$('#messageSearchInput');
+  if(!input || input.dataset.bound) return;
+  input.dataset.bound='1';
+  input.addEventListener('input',()=>{
+    const q=input.value.trim().toLowerCase();
+    document.querySelectorAll('#messages .message-search-hit').forEach(mark=>mark.replaceWith(document.createTextNode(mark.textContent)));
+    document.querySelectorAll('#messages .msg-row').forEach(row=>{
+      const text=(row.querySelector('.msg-text')||{}).textContent || '';
+      const match=!!q && text.toLowerCase().includes(q);
+      row.classList.toggle('hidden', !!q && !match);
+      if(match) highlightMessageText(row.querySelector('.msg-text'), q);
+    });
+  });
+  $('#closeMessageSearch').addEventListener('click',()=>{ input.value=''; document.querySelectorAll('#messages .message-search-hit').forEach(mark=>mark.replaceWith(document.createTextNode(mark.textContent))); document.querySelectorAll('#messages .msg-row').forEach(row=>row.classList.remove('hidden')); $('#messageSearchBar').classList.remove('show'); });
+}
+function highlightMessageText(root, query){
+  if(!root || !query) return;
+  const walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node=>{
+    const value=node.nodeValue, lower=value.toLowerCase(); let start=0, idx;
+    const frag=document.createDocumentFragment();
+    while((idx=lower.indexOf(query,start))!==-1){ frag.append(document.createTextNode(value.slice(start,idx))); const mark=document.createElement('mark'); mark.className='message-search-hit'; mark.textContent=value.slice(idx,idx+query.length); frag.append(mark); start=idx+query.length; }
+    if(start){ frag.append(document.createTextNode(value.slice(start))); node.replaceWith(frag); }
+  });
 }
 
 function renderPinnedMessages(messages){
@@ -1366,7 +1488,13 @@ function renderMessageRow(m){
   row.className = 'msg-row ' + (m.sender_id === me.id ? 'me' : 'them');
   row.dataset.id = m.id;
   const ticks = m.status === 'read' ? 'fa-check-double read' : 'fa-check';
+  const sender = m.sender_id === me.id ? myProfile : (activeConvo && activeConvo.is_group
+    ? (groupMembersCache.get(activeConvo.id) || []).find(p=>p.id===m.sender_id)
+    : (activeConvo ? otherParty(activeConvo) : null));
+  const senderName = sender && (sender.display_name || sender.phone) || 'User';
+  const senderAvatar = m.sender_id === me.id ? '' : `<div class="avatar msg-sender-avatar" style="background:${avatarColor(m.sender_id)}" title="${escapeHtml(senderName)}">${initials(senderName)}${onlinePeers[m.sender_id] ? '<span class="dot"></span>' : ''}</div>`;
   row.innerHTML = `
+    ${senderAvatar}
     <div class="bubble-wrap">
       <div class="bubble">
         <div class="msg-text">${linkifyMessageBody(m.body)}</div>
@@ -1508,9 +1636,17 @@ function subscribeToMessages(conversationId){
       $('#messages').appendChild(renderMessageRow(m));
       scrollBottom();
       if(m.sender_id !== me.id){
-        animateNotification('same');
         hideTyping();
-        sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
+        // The chat is already open, so consume the notification immediately
+        // and refresh the sidebar badge without requiring a reopen.
+        animateNotification('same');
+        const readField = myUnreadField(activeConvo || {});
+        if(activeConvo && activeConvo.id === conversationId) activeConvo[readField] = 0;
+        sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{
+          if(activeConvo && activeConvo.id === conversationId) activeConvo[readField] = 0;
+          loadConversations();
+          updateNotificationBadge();
+        });
       }
     })
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
@@ -1564,6 +1700,21 @@ function hideTyping(){
 /* ============ COMPOSER ============ */
 const msgInput = $('#msgInput');
 const sendBtn = $('#sendBtn');
+function adjustMobileViewport(){
+  if(!window.visualViewport) return;
+  const height = window.visualViewport.height;
+  if(window.innerWidth <= 860){
+    app.style.height = height + 'px';
+    $('#chatPanel').style.height = height + 'px';
+    if(document.activeElement === msgInput) requestAnimationFrame(()=>{ $('#messages').scrollTop = $('#messages').scrollHeight; });
+  } else {
+    app.style.height = '';
+    $('#chatPanel').style.height = '';
+  }
+}
+if(window.visualViewport) window.visualViewport.addEventListener('resize', adjustMobileViewport);
+window.addEventListener('resize', adjustMobileViewport);
+msgInput.addEventListener('focus', ()=>{ adjustMobileViewport(); requestAnimationFrame(()=>{ $('#messages').scrollTop = $('#messages').scrollHeight; }); });
 msgInput.addEventListener('input', ()=>{
   sendBtn.disabled = msgInput.value.trim().length === 0;
   autoGrow();
@@ -1680,6 +1831,34 @@ $('#chatNotifyBtn').addEventListener('click', ()=>{
 });
 $('#chatContactBtn').addEventListener('click',e=>{e.stopPropagation();$('#chatContactMenu').classList.toggle('show');});
 document.addEventListener('click',e=>{if(!e.target.closest('.chat-contact-wrap'))$('#chatContactMenu').classList.remove('show');});
+$('#searchMessagesBtn').addEventListener('click',()=>{
+  $('#chatContactMenu').classList.remove('show');
+  const bar=$('#messageSearchBar'); if(!bar) return;
+  bar.classList.add('show');
+  $('#messageSearchInput').focus();
+});
+$('#groupInfoBtn').addEventListener('click',async()=>{
+  if(!activeConvo) return;
+  const members = groupMembersCache.get(activeConvo.id) || [];
+  renderGroupInfo(activeConvo, members);
+  $('#chatContactMenu').classList.remove('show');
+});
+$('#groupMemberSearch').addEventListener('input',()=>{ if(activeConvo && activeConvo.is_group) renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]); });
+$('#saveGroupInfo').addEventListener('click',async()=>{
+  if(!activeConvo || !activeConvo.is_group) return;
+  const name=$('#groupInfoNameInput').value.trim();
+  if(!name){ showToast('Enter a group name.'); return; }
+  const { data, error } = await sb.rpc('group_update_details',{p_conversation_id:activeConvo.id,p_group_name:name,p_group_description:$('#groupInfoDescription').textContent==='No group description.'?'':$('#groupInfoDescription').textContent});
+  if(error){ showToast(error.message || 'Could not update group.'); return; }
+  activeConvo = { ...activeConvo, ...(data || {}), group_name:name };
+  renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]);
+  $('#chatName').textContent = name;
+  showToast('Group details updated.');
+});
+$('#groupAddMemberBtn').addEventListener('click',()=>{
+  showToast('To add members, use the group member tools in the next update.');
+  $('#chatContactMenu').classList.remove('show');
+});
 function currentContact(){ return activeConvo ? otherParty(activeConvo) : null; }
 $('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showContactProfile(p); $('#chatContactMenu').classList.remove('show');});
 $('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
@@ -1689,8 +1868,20 @@ $('#closeContactProfile').addEventListener('click',()=>$('#contactProfileScrim')
 $('#contactProfileScrim').addEventListener('click',e=>{if(e.target.id==='contactProfileScrim')$('#contactProfileScrim').classList.remove('show');});
 $('#contactCopyName').addEventListener('click',()=>copyContactField(contactProfileTarget && (contactProfileTarget.display_name||contactProfileTarget.phone),'Name'));
 $('#contactCopyPhone').addEventListener('click',()=>copyContactField(contactProfileTarget && contactProfileTarget.phone,'Phone number'));
-$('#contactChatNow').addEventListener('click',async()=>{if(!contactProfileTarget)return; $('#contactProfileScrim').classList.remove('show'); await startConversationWith(contactProfileTarget);});
+$('#contactChatNow').addEventListener('click',async()=>{
+  if(!contactProfileTarget) return;
+  const btn = $('#contactChatNow');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening…';
+  $('#contactProfileScrim').classList.remove('show');
+  $('#groupInfoScrim').classList.remove('show');
+  await startConversationWith(contactProfileTarget);
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-message"></i> Chat now';
+});
 $('#contactAddBtn').addEventListener('click',()=>{const p=contactProfileTarget; if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const url=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(url); showToast('Contact file created.');});
+$('#closeGroupInfo').addEventListener('click',()=>$('#groupInfoScrim').classList.remove('show'));
+$('#groupInfoScrim').addEventListener('click',e=>{if(e.target.id==='groupInfoScrim')$('#groupInfoScrim').classList.remove('show');});
 $(`#pinComposerBtn`).addEventListener('click',()=>showToast('Pin tools are ready for a future update.'));
 $('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
 $('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
@@ -1726,7 +1917,12 @@ async function runDiscover(){
       </div>
       <button id="startChatBtn">Message</button>
     </div>`;
-  $('#startChatBtn').addEventListener('click', ()=> startConversationWith(data));
+  $('#startChatBtn').addEventListener('click', async ()=>{
+    const btn = $('#startChatBtn');
+    btn.disabled = true;
+    btn.textContent = 'Opening…';
+    await startConversationWith(data);
+  });
 }
 $('#discoverBtn').addEventListener('click', runDiscover);
 $('#discoverInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runDiscover(); });
@@ -1844,35 +2040,42 @@ $('#profileForm').addEventListener('submit', async e=>{
 });
 
 async function startConversationWith(otherProfile){
+  if(!otherProfile || !otherProfile.id) return;
+  if(otherProfile.id === me.id){ showToast('That is your own profile.'); return; }
   const a = me.id < otherProfile.id ? me.id : otherProfile.id;
   const b = me.id < otherProfile.id ? otherProfile.id : me.id;
 
   let convoRow = null;
+  let startError = null;
   const existing = await sb.from('conversations')
     .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
-    .eq('user_a', a).eq('user_b', b).maybeSingle();
+    .eq('user_a', a).eq('user_b', b).eq('is_group', false).maybeSingle();
 
   if(existing.data){
     convoRow = existing.data;
   } else {
     const inserted = await sb.from('conversations').insert({ user_a:a, user_b:b }).select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)').single();
     if(inserted.error){
+      startError = inserted.error;
       // race: someone else created it a moment earlier — just re-fetch
       const retry = await sb.from('conversations')
         .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
-        .eq('user_a', a).eq('user_b', b).maybeSingle();
+        .eq('user_a', a).eq('user_b', b).eq('is_group', false).maybeSingle();
       convoRow = retry.data;
     } else {
       convoRow = inserted.data;
     }
   }
 
-  if(!convoRow){ showToast('Could not start conversation.'); return; }
+  if(!convoRow){ showToast((startError && startError.message) || 'Could not start conversation.'); return; }
 
   $('#discoverScrim').classList.remove('show');
+  $('#contactProfileScrim').classList.remove('show');
+  await sb.from('conversation_hidden').delete().eq('conversation_id', convoRow.id).eq('user_id', me.id);
   await loadConversations();
   const fresh = conversations.find(c=>c.id === convoRow.id) || convoRow;
-  openConversation(fresh);
+  await openConversation(fresh);
+  msgInput.focus();
 }
 
 /* ============ BACK / THEME / LOGOUT ============ */
