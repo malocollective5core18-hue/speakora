@@ -1875,8 +1875,22 @@ async function searchAddMembers(){
   if(phoneSearch) query=query.ilike('phone',`%${clean}%`);
   else { const ids=conversations.map(c=>otherParty(c)).filter(Boolean).map(p=>p.id).filter(Boolean); if(!ids.length){box.innerHTML='<div class="discover-empty">No previous contacts yet.</div>';return;} query=query.in('id',ids).ilike('display_name',`%${clean}%`); }
   const {data}=await query.limit(12);
-  const rows=(data||[]).filter(p=>p.id!==me.id&&!existing.has(p.id));
-  if(!rows.length){box.innerHTML='<div class="discover-empty">No available contact found.</div>';return;}
+  const matches=(data||[]).filter(p=>p.id!==me.id);
+  if(phoneSearch){
+    const enteredPhone=normalizePhone(term);
+    const duplicate=matches.find(p=>normalizePhone(p.phone||'')===enteredPhone && existing.has(p.id));
+    if(duplicate){
+      const name=duplicate.display_name||duplicate.phone||'This person';
+      box.innerHTML=`<div class="discover-empty">${escapeHtml(name)} is already a member of this group.</div>`;
+      return;
+    }
+  }
+  const rows=matches.filter(p=>!existing.has(p.id));
+  if(!rows.length){
+    const alreadyExists=matches.some(p=>existing.has(p.id));
+    box.innerHTML=`<div class="discover-empty">${alreadyExists?'This person is already a member of this group.':'No available contact found.'}</div>`;
+    return;
+  }
   box.innerHTML=rows.map(p=>{const name=p.display_name||p.phone||'Speakora user'; return `<div class="result-card"><div class="avatar sm" style="background:${avatarColor(p.id)}">${initials(name)}</div><div class="result-info"><div class="result-name">${escapeHtml(name)}</div><div class="result-sub">${escapeHtml(p.phone||'')}</div></div><button type="button" data-add-member-id="${p.id}">${addMemberProfiles.has(p.id)?'Remove':'Add'}</button></div>`;}).join('');
   box.querySelectorAll('[data-add-member-id]').forEach(btn=>btn.addEventListener('click',()=>{const p=rows.find(x=>x.id===btn.dataset.addMemberId); if(addMemberProfiles.has(p.id)) addMemberProfiles.delete(p.id); else addMemberProfiles.set(p.id,p); renderAddMemberSelection(); searchAddMembers();}));
 }
