@@ -312,6 +312,7 @@ button,input,select,textarea{font-family:inherit;}
 .share-secondary{ background:var(--panel-2); color:var(--text); }
 .delete-choice-modal{position:relative;max-width:380px}.delete-choice-actions{display:flex;flex-direction:column;gap:8px;margin-top:18px}.delete-choice-actions button{border:0;border-radius:var(--radius-sm);padding:11px 12px;font-weight:700;cursor:pointer}.delete-choice-all{background:var(--danger);color:#fff}.delete-choice-me{background:var(--grad);color:#fff}.delete-choice-cancel{background:var(--panel-2);color:var(--text)}
 .recontact-modal{position:relative;max-width:390px}.recontact-actions{display:flex;gap:8px;margin-top:18px}.recontact-actions button{flex:1;border:0;border-radius:var(--radius-sm);padding:11px;font-weight:700;cursor:pointer}.recontact-allow{background:var(--grad);color:#fff}.recontact-reject{background:rgba(241,85,93,.16);color:#ff8a90;border:1px solid rgba(241,85,93,.35)!important}
+.rejected-contacts-modal{position:relative;max-width:500px}.rejected-contacts-list{display:grid;gap:8px;max-height:52vh;overflow:auto;margin-top:16px}.rejected-contact-row{display:flex;align-items:center;gap:10px;padding:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:var(--radius-sm)}.rejected-contact-row .avatar{width:40px;height:40px;font-size:12px}.rejected-contact-info{flex:1;min-width:0}.rejected-contact-name{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.rejected-contact-meta{font-size:11px;color:var(--text-faint)}.rejected-contact-actions{display:flex;gap:6px}.rejected-contact-actions button{border:0;border-radius:7px;padding:7px 9px;font-size:11px;font-weight:700;cursor:pointer}.rejected-contact-accept{background:var(--grad);color:#fff}.rejected-contact-leave{background:var(--panel-3);color:var(--text-dim)}
 .rejected-notice{align-self:center;color:#ff8a90;background:rgba(241,85,93,.12);border:1px solid rgba(241,85,93,.3);border-radius:999px;padding:7px 12px;font-size:12px;margin:10px 0}
 .phone-link{border:0;background:transparent;color:inherit;text-decoration:underline;text-decoration-style:dotted;padding:0;cursor:pointer;font:inherit}
 .phone-link:hover{color:var(--violet)}
@@ -453,6 +454,7 @@ button,input,select,textarea{font-family:inherit;}
           <div class="more-menu" id="moreMenu">
             <button type="button" id="shareContactBtn"><i class="fa-solid fa-link"></i> Share my contact link</button>
             <button type="button" id="profileBtn"><i class="fa-solid fa-user"></i> My Speakora profile</button>
+            <button type="button" id="rejectedContactsBtn"><i class="fa-solid fa-user-clock"></i> Rejected contacts</button>
           </div>
         </div>
         <button class="icon-btn" id="logoutBtn" title="Log out"><i class="fa-solid fa-arrow-right-from-bracket"></i></button>
@@ -598,6 +600,15 @@ button,input,select,textarea{font-family:inherit;}
       <button type="button" class="recontact-allow" id="allowRecontactBtn">Allow</button>
       <button type="button" class="recontact-reject" id="rejectRecontactBtn">Reject</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-scrim" id="rejectedContactsScrim">
+  <div class="discover-modal rejected-contacts-modal">
+    <button class="icon-btn close-modal" id="closeRejectedContacts"><i class="fa-solid fa-xmark"></i></button>
+    <h3>Rejected contacts</h3>
+    <p>People whose reconnect requests you rejected. Accept one to restore the chat, or leave it rejected.</p>
+    <div class="rejected-contacts-list" id="rejectedContactsList"></div>
   </div>
 </div>
 
@@ -1122,6 +1133,7 @@ function subscribeToRecontactRequests(){
   if(recontactChannel) sb.removeChannel(recontactChannel);
   recontactChannel = sb.channel('recontact-' + me.id)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'conversation_recontact_requests', filter:`recipient_id=eq.${me.id}` }, payload=>showRecontactPrompt(payload.new))
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`recipient_id=eq.${me.id}` }, payload=>showRecontactPrompt(payload.new))
     .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`requester_id=eq.${me.id}` }, payload=>{
       const req=payload.new;
       if(req.status==='rejected'){
@@ -1129,7 +1141,14 @@ function subscribeToRecontactRequests(){
         showToast('Your request to restart this chat was rejected.');
         loadConversations().then(()=>{ const convo=conversations.find(c=>c.id===req.conversation_id); if(convo){ convo._recontactRejected=true; openConversation(convo); } });
       } else if(req.status==='allowed'){
-        loadConversations();
+        loadConversations().then(()=>{
+          const convo=conversations.find(c=>c.id===req.conversation_id);
+          if(convo && activeConvo && activeConvo.id===convo.id){
+            activeConvo._recontactRejected=false;
+            activeConvo._recontactAllowed=true;
+            openConversation(convo);
+          }
+        });
         showToast('Your chat request was allowed. You can continue chatting.');
       }
     }).subscribe();
@@ -1155,6 +1174,54 @@ async function showRecontactPrompt(request){
   $('#recontactTitle').textContent=`${name} wants to chat again`;
   $('#recontactText').textContent=`${name} deleted this chat and is trying to contact you again. Allow to restore the latest 10 messages, or reject.`;
   $('#recontactScrim').classList.add('show');
+}
+
+async function openRejectedContacts(){
+  moreMenu.classList.remove('show');
+  moreBtn.setAttribute('aria-expanded','false');
+  const box = $('#rejectedContactsList');
+  box.innerHTML = '<div class="discover-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
+  $('#rejectedContactsScrim').classList.add('show');
+  const { data: requests, error } = await sb.from('conversation_recontact_requests')
+    .select('id,conversation_id,requester_id,request_count,created_at')
+    .eq('recipient_id', me.id).eq('status','rejected')
+    .order('created_at', { ascending:false });
+  if(error){
+    box.innerHTML = '<div class="discover-empty">Run the latest migration_recontact.sql in Supabase SQL Editor first.</div>';
+    return;
+  }
+  if(!requests || !requests.length){
+    box.innerHTML = '<div class="discover-empty">No rejected contacts.</div>';
+    return;
+  }
+  const ids = [...new Set(requests.map(r=>r.requester_id))];
+  const { data: profiles } = await sb.from('profiles').select('*').in('id', ids);
+  const byId = new Map((profiles || []).map(p=>[p.id,p]));
+  box.innerHTML = requests.map(request=>{
+    const profile = byId.get(request.requester_id) || {};
+    const name = profile.display_name || profile.phone || 'Speakora user';
+    const count = Math.max(1, Number(request.request_count) || 1);
+    return `<div class="rejected-contact-row" data-rejected-request="${request.id}">
+      <div class="avatar" style="background:${avatarColor(profile.id || request.requester_id)}">${initials(name)}</div>
+      <div class="rejected-contact-info"><div class="rejected-contact-name">${escapeHtml(name)}</div><div class="rejected-contact-meta">${escapeHtml(profile.phone || '')} · ${count} reconnect attempt${count===1?'':'s'}</div></div>
+      <div class="rejected-contact-actions"><button type="button" class="rejected-contact-accept" data-accept-recontact="${request.id}">Accept</button></div>
+    </div>`;
+  }).join('');
+  box.querySelectorAll('[data-accept-recontact]').forEach(btn=>btn.addEventListener('click', async ()=>{
+    btn.disabled = true;
+    const { data, error: acceptError } = await sb.rpc('allow_recontact_from_history', { p_request_id:btn.dataset.acceptRecontact });
+    if(acceptError){
+      btn.disabled = false;
+      showToast(acceptError.code === 'PGRST202' ? 'Run the latest migration_recontact.sql in Supabase SQL Editor first.' : (acceptError.message || 'Could not accept contact.'));
+      return;
+    }
+    const convoId = data && data.conversation_id;
+    $('#rejectedContactsScrim').classList.remove('show');
+    await loadConversations();
+    const convo = conversations.find(c=>c.id===convoId);
+    if(convo){ convo._recontactAllowed=true; convo._recontactRejected=false; await openConversation(convo); }
+    showToast('Contact accepted. Chat restored.');
+  }));
 }
 
 function appendRejectedNotice(){
@@ -1416,8 +1483,8 @@ async function openConversation(convo){
     history.pushState({ ...(history.state || {}), speakoraChat: convo.id }, '', location.href);
   }
   activeConvo = convo;
-  msgInput.disabled = !!convo._recontactRejected;
-  sendBtn.disabled = !!convo._recontactRejected;
+  msgInput.disabled = false;
+  sendBtn.disabled = true;
   renderedMessageIds = new Set();
   $('#emptyState').style.display = 'none';
   $('#chatContent').style.display = 'flex';
@@ -1841,7 +1908,16 @@ sendBtn.addEventListener('click', sendMessage);
 
 async function sendMessage(){
   const text = msgInput.value.trim();
-  if(!text || !activeConvo || activeConvo._recontactRejected) return;
+  if(!text || !activeConvo) return;
+  if(activeConvo._recontactRejected){
+    const {error}=await sb.rpc('request_recontact',{p_conversation_id:activeConvo.id});
+    if(error){ showToast(error.code==='PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (error.message || 'Could not send reconnect request.')); return; }
+    msgInput.value='';
+    autoGrow();
+    sendBtn.disabled=true;
+    showToast('Reconnect request sent. Waiting for approval.');
+    return;
+  }
   msgInput.value = '';
   sendBtn.disabled = true;
   autoGrow();
@@ -2181,8 +2257,11 @@ function openProfileModal(){
   $('#profileScrim').classList.add('show');
 }
 $('#profileBtn').addEventListener('click', ()=>{ moreMenu.classList.remove('show'); moreBtn.setAttribute('aria-expanded','false'); openProfileModal(); });
+$('#rejectedContactsBtn').addEventListener('click', openRejectedContacts);
 $('#closeProfile').addEventListener('click', ()=> $('#profileScrim').classList.remove('show'));
 $('#profileScrim').addEventListener('click', e=>{ if(e.target.id === 'profileScrim') $('#profileScrim').classList.remove('show'); });
+$('#closeRejectedContacts').addEventListener('click', ()=> $('#rejectedContactsScrim').classList.remove('show'));
+$('#rejectedContactsScrim').addEventListener('click', e=>{ if(e.target.id === 'rejectedContactsScrim') $('#rejectedContactsScrim').classList.remove('show'); });
 $('#profileName').addEventListener('input', e=>{ $('#profileAvatarLarge').textContent = initials(e.target.value) || '?'; });
 $('#profilePhone').addEventListener('input', e=>{
   const country = countryFromPhone(normalizePhone(e.target.value));
