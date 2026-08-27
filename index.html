@@ -831,7 +831,12 @@ function showToast(msg){
   t._timer = setTimeout(()=> t.classList.remove('show'), 3200);
 }
 function updateNotificationBadge(){
-  const count = conversations.reduce((sum, convo)=> sum + (convo[myUnreadField(convo)] || 0), 0);
+  const count = conversations.reduce((sum, convo)=>{
+    // Messages in the conversation currently on screen are being read, even
+    // if the database counter has not finished updating yet.
+    if(activeConvo && convo.id === activeConvo.id) return sum;
+    return sum + (convo[myUnreadField(convo)] || 0);
+  }, 0);
   const badge = $('#notifyCount');
   const button = $('#chatNotifyBtn');
   if(!badge || !button) return;
@@ -1431,7 +1436,10 @@ async function openConversation(convo){
   const field = myUnreadField(convo);
   if(convo[field]){
     convo[field] = 0;
-    sb.rpc('mark_conversation_read', { p_conversation_id: convo.id }).then(()=>{});
+    const localConvo = conversations.find(c=>c.id===convo.id);
+    if(localConvo) localConvo[field] = 0;
+    updateNotificationBadge();
+    await sb.rpc('mark_conversation_read', { p_conversation_id: convo.id });
   }
   renderConvoList($('#searchInput').value);
 
