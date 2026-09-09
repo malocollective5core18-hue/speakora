@@ -658,1756 +658,1199 @@ button,input,select,textarea{font-family:inherit;}
 
 <div id="toast"></div>
 <script>
+  /* Shared backend configuration. Replace with your own project's
+     URL/anon key if these ever change. The anon key is safe to expose
+     only because RLS policies + RPCs (see migration SQL) gate every
+     write. */
+  const SUPABASE_URL = 'https://zzgnrqmaymlaaumjlxzl.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6Z25ycW1heW1sYWF1bWpseHpsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODg5NDY4MTcsImV4cCI6MjEwNDUyMjgxN30.fIQKlZ3uMbtBvnBoWQzeCdjOjiPGVz3ndLACOUefbs4';
+  const PHOTO_BUCKET = 'phone-photos';
 
+  const supabaseClient = window.supabase && window.supabase.createClient
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: true, autoRefreshToken: true }
+      })
+    : null;
 
+  function hasSupabaseConnection() {
+    return Boolean(supabaseClient);
+  }
 
-
-
-const SUPABASE_URL = "https://xrkvtonkswxaoxhkwfgt.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inhya3Z0b25rc3d4YW94aGt3Zmd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc3NTc2OTUsImV4cCI6MjEwMzMzMzY5NX0.1B6g1_TyZH70U7pUiqOGKIwSz0Hq4c3Qd5e4ZiEMDuA";
+  if (!supabaseClient) {
+    console.warn('Supabase library did not load. SimuPesa cannot read or write data until it is available.');
+  }
 </script>
 
 <script>
-(function(){
-'use strict';
+  /* =====================================================
+     SIMUPESA APP LOGIC — Supabase-backed (multi-device)
+     No record data is read from or written to localStorage.
+     localStorage/sessionStorage may still hold short-lived UI
+     state only (none currently used).
+     ===================================================== */
 
-/* ============ SETUP GATE CHECK ============ */
-if(!SUPABASE_URL || SUPABASE_URL.indexOf('YOUR_') === 0 || !SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.indexOf('YOUR_') === 0){
-  document.getElementById('setupGate').classList.remove('hidden');
-  return;
-}
+  function normalizePhone(p){ return (p || '').replace(/[^0-9]/g, ''); }
 
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-/* ============ DIAL CODE / COUNTRY TABLE ============
-   Approximate E.164 lookup for a prototype — not a full libphonenumber
-   replacement, but covers the common cases including a full East Africa set. */
-const DIAL_CODES = [
-  {dial:'+1',   iso:'US', name:'United States / Canada'},
-  {dial:'+7',   iso:'RU', name:'Russia / Kazakhstan'},
-  {dial:'+20',  iso:'EG', name:'Egypt'},
-  {dial:'+27',  iso:'ZA', name:'South Africa'},
-  {dial:'+30',  iso:'GR', name:'Greece'},
-  {dial:'+31',  iso:'NL', name:'Netherlands'},
-  {dial:'+32',  iso:'BE', name:'Belgium'},
-  {dial:'+33',  iso:'FR', name:'France'},
-  {dial:'+34',  iso:'ES', name:'Spain'},
-  {dial:'+39',  iso:'IT', name:'Italy'},
-  {dial:'+40',  iso:'RO', name:'Romania'},
-  {dial:'+44',  iso:'GB', name:'United Kingdom'},
-  {dial:'+45',  iso:'DK', name:'Denmark'},
-  {dial:'+46',  iso:'SE', name:'Sweden'},
-  {dial:'+47',  iso:'NO', name:'Norway'},
-  {dial:'+48',  iso:'PL', name:'Poland'},
-  {dial:'+49',  iso:'DE', name:'Germany'},
-  {dial:'+51',  iso:'PE', name:'Peru'},
-  {dial:'+52',  iso:'MX', name:'Mexico'},
-  {dial:'+53',  iso:'CU', name:'Cuba'},
-  {dial:'+54',  iso:'AR', name:'Argentina'},
-  {dial:'+55',  iso:'BR', name:'Brazil'},
-  {dial:'+56',  iso:'CL', name:'Chile'},
-  {dial:'+57',  iso:'CO', name:'Colombia'},
-  {dial:'+58',  iso:'VE', name:'Venezuela'},
-  {dial:'+60',  iso:'MY', name:'Malaysia'},
-  {dial:'+61',  iso:'AU', name:'Australia'},
-  {dial:'+62',  iso:'ID', name:'Indonesia'},
-  {dial:'+63',  iso:'PH', name:'Philippines'},
-  {dial:'+64',  iso:'NZ', name:'New Zealand'},
-  {dial:'+65',  iso:'SG', name:'Singapore'},
-  {dial:'+66',  iso:'TH', name:'Thailand'},
-  {dial:'+81',  iso:'JP', name:'Japan'},
-  {dial:'+82',  iso:'KR', name:'South Korea'},
-  {dial:'+84',  iso:'VN', name:'Vietnam'},
-  {dial:'+86',  iso:'CN', name:'China'},
-  {dial:'+90',  iso:'TR', name:'Turkey'},
-  {dial:'+91',  iso:'IN', name:'India'},
-  {dial:'+92',  iso:'PK', name:'Pakistan'},
-  {dial:'+93',  iso:'AF', name:'Afghanistan'},
-  {dial:'+94',  iso:'LK', name:'Sri Lanka'},
-  {dial:'+95',  iso:'MM', name:'Myanmar'},
-  {dial:'+98',  iso:'IR', name:'Iran'},
-  {dial:'+211', iso:'SS', name:'South Sudan'},
-  {dial:'+212', iso:'MA', name:'Morocco'},
-  {dial:'+213', iso:'DZ', name:'Algeria'},
-  {dial:'+216', iso:'TN', name:'Tunisia'},
-  {dial:'+218', iso:'LY', name:'Libya'},
-  {dial:'+220', iso:'GM', name:'Gambia'},
-  {dial:'+221', iso:'SN', name:'Senegal'},
-  {dial:'+223', iso:'ML', name:'Mali'},
-  {dial:'+224', iso:'GN', name:'Guinea'},
-  {dial:'+225', iso:'CI', name:'Côte d’Ivoire'},
-  {dial:'+226', iso:'BF', name:'Burkina Faso'},
-  {dial:'+227', iso:'NE', name:'Niger'},
-  {dial:'+228', iso:'TG', name:'Togo'},
-  {dial:'+229', iso:'BJ', name:'Benin'},
-  {dial:'+230', iso:'MU', name:'Mauritius'},
-  {dial:'+231', iso:'LR', name:'Liberia'},
-  {dial:'+232', iso:'SL', name:'Sierra Leone'},
-  {dial:'+233', iso:'GH', name:'Ghana'},
-  {dial:'+234', iso:'NG', name:'Nigeria'},
-  {dial:'+235', iso:'TD', name:'Chad'},
-  {dial:'+236', iso:'CF', name:'Central African Republic'},
-  {dial:'+237', iso:'CM', name:'Cameroon'},
-  {dial:'+238', iso:'CV', name:'Cape Verde'},
-  {dial:'+240', iso:'GQ', name:'Equatorial Guinea'},
-  {dial:'+241', iso:'GA', name:'Gabon'},
-  {dial:'+243', iso:'CD', name:'DR Congo'},
-  {dial:'+244', iso:'AO', name:'Angola'},
-  {dial:'+245', iso:'GW', name:'Guinea-Bissau'},
-  {dial:'+248', iso:'SC', name:'Seychelles'},
-  {dial:'+249', iso:'SD', name:'Sudan'},
-  {dial:'+250', iso:'RW', name:'Rwanda'},
-  {dial:'+251', iso:'ET', name:'Ethiopia'},
-  {dial:'+252', iso:'SO', name:'Somalia'},
-  {dial:'+253', iso:'DJ', name:'Djibouti'},
-  {dial:'+254', iso:'KE', name:'Kenya'},
-  {dial:'+255', iso:'TZ', name:'Tanzania'},
-  {dial:'+256', iso:'UG', name:'Uganda'},
-  {dial:'+257', iso:'BI', name:'Burundi'},
-  {dial:'+258', iso:'MZ', name:'Mozambique'},
-  {dial:'+260', iso:'ZM', name:'Zambia'},
-  {dial:'+261', iso:'MG', name:'Madagascar'},
-  {dial:'+263', iso:'ZW', name:'Zimbabwe'},
-  {dial:'+264', iso:'NA', name:'Namibia'},
-  {dial:'+265', iso:'MW', name:'Malawi'},
-  {dial:'+266', iso:'LS', name:'Lesotho'},
-  {dial:'+267', iso:'BW', name:'Botswana'},
-  {dial:'+268', iso:'SZ', name:'Eswatini'},
-  {dial:'+353', iso:'IE', name:'Ireland'},
-  {dial:'+351', iso:'PT', name:'Portugal'},
-  {dial:'+852', iso:'HK', name:'Hong Kong'},
-  {dial:'+880', iso:'BD', name:'Bangladesh'},
-  {dial:'+971', iso:'AE', name:'United Arab Emirates'},
-  {dial:'+966', iso:'SA', name:'Saudi Arabia'},
-  {dial:'+972', iso:'IL', name:'Israel'},
-  {dial:'+974', iso:'QA', name:'Qatar'},
-];
-const DIAL_CODES_SORTED = [...DIAL_CODES].sort((a,b)=> b.dial.length - a.dial.length);
-
-function countryFromPhone(phone){
-  if(!phone) return null;
-  const match = DIAL_CODES_SORTED.find(d => phone.startsWith(d.dial));
-  return match || null;
-}
-function normalizePhone(raw){
-  if(!raw) return '';
-  let p = raw.trim().replace(/[\s\-().]/g, '');
-  if(!p.startsWith('+')) p = '+' + p.replace(/^0+/, '');
-  return p;
-}
-
-/* ============ DOM ============ */
-const $ = s => document.querySelector(s);
-const setupGate = $('#setupGate');
-const authScreen = $('#authScreen');
-const onboardingScreen = $('#onboardingScreen');
-const app = $('#app');
-
-/* ============ STATE ============ */
-let session = null;
-let me = null;              // auth user
-let myProfile = null;       // profiles row
-let conversations = [];     // list w/ embedded other-party profile
-let activeConvo = null;
-let messagesChannel = null;
-let inboxMessagesChannel = null;
-let conversationsChannel = null;
-let presenceChannel = null;
-let recontactChannel = null;
-let activeRecontactRequest = null;
-let recontactPollTimer = null;
-let onlinePeers = {};
-let typingTimeout = null;
-let renderedMessageIds = new Set();
-let selectedMessageIds = new Set();
-let messageCache = new Map();
-let activeChatFilter = 'all';
-let favoriteConversationIds = new Set();
-let leftGroupIds = new Set();
-let selectedGroupProfiles = new Map();
-let addMemberProfiles = new Map();
-let groupMembersCache = new Map();
-try{ favoriteConversationIds = new Set(JSON.parse(localStorage.getItem('speakora-favorites') || '[]')); }catch(e){}
-try{ leftGroupIds = new Set(JSON.parse(localStorage.getItem('speakora-left-groups') || '[]')); }catch(e){}
-function saveFavorites(){ try{ localStorage.setItem('speakora-favorites', JSON.stringify([...favoriteConversationIds])); }catch(e){} }
-function saveLeftGroups(){ try{ localStorage.setItem('speakora-left-groups', JSON.stringify([...leftGroupIds])); }catch(e){} }
-function recontactNoticeKey(id){ return `speakora-recontact-rejected-${id}`; }
-function isRejectedConversation(convo){
-  return !!(convo && (convo._recontactRejected || localStorage.getItem(recontactNoticeKey(convo.id))));
-}
-let pendingContactLink = new URLSearchParams(window.location.search).get('contact');
-let pendingContactKey = new URLSearchParams(window.location.search).get('key');
-
-function showToast(msg){
-  const t = $('#toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  clearTimeout(t._timer);
-  t._timer = setTimeout(()=> t.classList.remove('show'), 3200);
-}
-function updateNotificationBadge(){
-  const count = conversations.reduce((sum, convo)=>{
-    // Messages in the conversation currently on screen are being read, even
-    // if the database counter has not finished updating yet.
-    if(activeConvo && convo.id === activeConvo.id) return sum;
-    if(isRejectedConversation(convo)) return sum;
-    return sum + (convo[myUnreadField(convo)] || 0);
-  }, 0);
-  const badge = $('#notifyCount');
-  const button = $('#chatNotifyBtn');
-  if(!badge || !button) return;
-  badge.textContent = count > 99 ? '99+' : String(count);
-  badge.classList.toggle('hidden', count === 0);
-  button.setAttribute('aria-label', count ? `${count} unread message${count === 1 ? '' : 's'}` : 'No unread messages');
-}
-function updateMessageActions(){
-  const ids = [...selectedMessageIds];
-  const bar = $('#messageActions');
-  if(!bar) return;
-  bar.classList.toggle('hidden', ids.length === 0);
-  $('#selectedMessageCount').textContent = `${ids.length} selected`;
-  const selected = ids.map(id => messageCache.get(id)).filter(Boolean);
-  $('#editMessageBtn').disabled = selected.length !== 1 || selected[0].sender_id !== me.id || !!selected[0].deleted_at;
-  $('#deleteMessageBtn').disabled = selected.length === 0;
-  $('#forwardMessageBtn').disabled = selected.length !== 1;
-  $('#pinMessageBtn').disabled = selected.length !== 1;
-  $('#copyMessageBtn').disabled = selected.length !== 1;
-}
-function clearMessageSelection(){
-  selectedMessageIds.clear();
-  document.querySelectorAll('.msg-row.selected').forEach(row=>row.classList.remove('selected'));
-  updateMessageActions();
-}
-function toggleMessageSelection(id){
-  if(selectedMessageIds.has(id)) selectedMessageIds.delete(id); else selectedMessageIds.add(id);
-  const row = $(`.msg-row[data-id="${id}"]`);
-  if(row) row.classList.toggle('selected', selectedMessageIds.has(id));
-  updateMessageActions();
-}
-function animateNotification(type){
-  const button = $('#chatNotifyBtn');
-  if(!button) return;
-  button.classList.remove('notify-other', 'notify-same');
-  void button.offsetWidth;
-  const sameConversation = type === 'same';
-  button.classList.add(sameConversation ? 'notify-same' : 'notify-other');
-  if('vibrate' in navigator){
-    try{ navigator.vibrate(sameConversation ? [70, 45, 70] : [120, 70, 120, 70, 120]); }catch(e){}
+  function escapeHtml(str){
+    var div = document.createElement('div');
+    div.textContent = str || '';
+    return div.innerHTML;
   }
-  setTimeout(()=> button.classList.remove('notify-other', 'notify-same'), sameConversation ? 1300 : 2900);
-}
-function initials(name){
-  if(!name) return '?';
-  return name.split(' ').map(w=>w[0]).filter(Boolean).slice(0,2).join('').toUpperCase();
-}
-function avatarColor(seed){
-  const colors = ['#E23A9C','#7C4FEA','#4A63F0','#E2703A','#39B0D9','#39D98A','#D93974','#F59E0B','#14B8A6','#8B5CF6','#EF4444','#06B6D4','#84CC16','#F97316','#EC4899','#6366F1'];
-  let h = 0; for(let i=0;i<(seed||'').length;i++) h = (h*31 + seed.charCodeAt(i)) % colors.length;
-  return colors[Math.abs(h)];
-}
-function timeLabel(iso){
-  if(!iso) return '';
-  const d = new Date(iso);
-  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-}
 
-/* ============ THEME ============ */
-function applyTheme(t){
-  document.documentElement.setAttribute('data-theme', t);
-  const btn = $('#themeBtn');
-  if(btn) btn.innerHTML = t==='dark' ? '<i class="fa-solid fa-moon"></i>' : '<i class="fa-solid fa-sun"></i>';
-  try{ localStorage.setItem('speakora-theme', t); }catch(e){}
-}
-let savedTheme = 'dark';
-try{ savedTheme = localStorage.getItem('speakora-theme') || 'dark'; }catch(e){}
-applyTheme(savedTheme);
-
-/* ============ AUTH SCREEN WIRING ============ */
-$('#tabLogin').addEventListener('click', ()=> switchAuthTab('login'));
-$('#tabSignup').addEventListener('click', ()=> switchAuthTab('signup'));
-$('#gotoSignup').addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('signup'); });
-
-function switchAuthTab(which){
-  $('#tabLogin').classList.toggle('active', which==='login');
-  $('#tabSignup').classList.toggle('active', which==='signup');
-  $('#loginForm').classList.toggle('hidden', which!=='login');
-  $('#signupForm').classList.toggle('hidden', which!=='signup');
-  $('#authHint').innerHTML = which==='login'
-    ? `Don't have an account? <a href="#" id="gotoSignup2" style="color:var(--violet); text-decoration:none; font-weight:600;">Sign up</a>`
-    : `Already have an account? <a href="#" id="gotoLogin2" style="color:var(--violet); text-decoration:none; font-weight:600;">Log in</a>`;
-  const s2 = $('#gotoSignup2'); if(s2) s2.addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('signup'); });
-  const l2 = $('#gotoLogin2'); if(l2) l2.addEventListener('click', e=>{ e.preventDefault(); switchAuthTab('login'); });
-  hideAuthMsg();
-}
-function showAuthMsg(msg, type){
-  const el = $('#authMsg');
-  el.textContent = msg;
-  el.className = 'auth-msg show ' + (type||'error');
-}
-function hideAuthMsg(){ $('#authMsg').className = 'auth-msg'; }
-
-document.querySelectorAll('.password-toggle').forEach(toggle=>{
-  toggle.addEventListener('click', ()=>{
-    const input = document.getElementById(toggle.dataset.target);
-    if(!input) return;
-    const showing = input.type === 'password';
-    input.type = showing ? 'text' : 'password';
-    toggle.setAttribute('aria-label', showing ? 'Hide password' : 'Show password');
-    toggle.setAttribute('aria-pressed', String(showing));
-    toggle.innerHTML = `<i class="fa-regular ${showing ? 'fa-eye-slash' : 'fa-eye'}"></i>`;
-  });
-});
-
-$('#loginForm').addEventListener('submit', async e=>{
-  e.preventDefault();
-  hideAuthMsg();
-  const email = $('#loginEmail').value.trim();
-  const password = $('#loginPassword').value;
-  console.log('[Speakora auth] Login attempt', { email });
-  const btn = $('#loginBtn');
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Logging in…';
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
-  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-arrow-right-to-bracket"></i> Log in';
-  if(error){
-    console.error('[Speakora auth] Login failed', { email, status:error.status, code:error.code, message:error.message });
-    showAuthMsg(error.message, 'error');
-    return;
+  function fmtDate(value){
+    if (!value) return '-';
+    try { return new Date(value).toLocaleString('sw-TZ'); }
+    catch (e) { return String(value); }
   }
-  console.log('[Speakora auth] Login succeeded', { userId:data.user && data.user.id });
-  await handleAuthenticated(data.session);
-});
 
-$('#signupForm').addEventListener('submit', async e=>{
-  e.preventDefault();
-  hideAuthMsg();
-  const email = $('#signupEmail').value.trim();
-  const password = $('#signupPassword').value;
-  const password2 = $('#signupPassword2').value;
-  if(password !== password2){ showAuthMsg("Passwords don't match.", 'error'); return; }
-  const btn = $('#signupBtn');
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Creating account…';
-  console.log('[Speakora auth] Signup attempt', { email });
-  const { data, error } = await sb.auth.signUp({ email, password });
-  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-user-plus"></i> Create account';
-  if(error){
-    console.error('[Speakora auth] Signup failed', { email, status:error.status, code:error.code, message:error.message });
-    const rateLimited = error.status === 429 || error.code === 'over_email_send_rate_limit';
-    showAuthMsg(rateLimited
-      ? 'Too many signup emails were requested. Please wait and try again later, or ask the project owner to configure a custom SMTP provider.'
-      : error.message, 'error');
-    return;
+  function fmtMoney(value){
+    if (value === null || value === undefined || value === '') return '-';
+    return 'TZS ' + Number(value).toLocaleString('en-US');
   }
-  if(!data.session){
-    // If confirmation is disabled, signUp can still return no session in some
-    // configurations. Try an immediate login before showing the confirmation
-    // fallback to the user.
-    console.log('[Speakora auth] Signup created account without session; attempting automatic login', { email });
-    const autoLogin = await sb.auth.signInWithPassword({ email, password });
-    if(autoLogin.error){
-      console.warn('[Speakora auth] Automatic login unavailable', {
-        email, status:autoLogin.error.status, code:autoLogin.error.code, message:autoLogin.error.message
+
+  /* ===================== VIEW ROUTING ===================== */
+  function showView(id){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('is-active'); });
+    var el = document.getElementById(id);
+    if (el) el.classList.add('is-active');
+    window.scrollTo(0, 0);
+    if (id === 'adminDashboardView') { renderAdminTables(); }
+  }
+
+  var currentApplicant = null; // { seller_id, application_id, full_name }
+
+  /* ===================== DATA ACCESS LAYER ===================== */
+
+  async function fetchSellerOverview(){
+    if (!supabaseClient) return [];
+    var result = await supabaseClient
+      .from('admin_seller_overview')
+      .select('*')
+      .order('registered_at', { ascending: false });
+    if (result.error) { console.error('fetchSellerOverview', result.error); return []; }
+    return result.data || [];
+  }
+
+  async function fetchFullApplication(applicationId){
+    if (!supabaseClient || !applicationId) return null;
+    var result = await supabaseClient
+      .from('sellers')
+      .select('*, applications(*, application_photos(*), application_responses(*))')
+      .eq('application_id', applicationId)
+      .maybeSingle();
+    if (result.error) { console.error('fetchFullApplication', result.error); return null; }
+    return result.data;
+  }
+
+  async function signedPhotoUrl(path){
+    if (!path || !supabaseClient) return null;
+    var result = await supabaseClient.storage.from(PHOTO_BUCKET).createSignedUrl(path, 3600);
+    if (result.error) { console.warn('signedPhotoUrl failed for ' + path, result.error); return null; }
+    return result.data.signedUrl;
+  }
+
+  async function urlToDataUrl(url){
+    if (!url) return null;
+    try {
+      var res = await fetch(url);
+      var blob = await res.blob();
+      return await new Promise(function (resolve, reject) {
+        var reader = new FileReader();
+        reader.onload = function () { resolve(reader.result); };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
-      // Email confirmation is required by this project's Auth settings.
-      switchAuthTab('login');
-      showAuthMsg('Account created. Check your email to confirm it, then log in.', 'info');
-      return;
+    } catch (e) {
+      console.warn('urlToDataUrl failed', e);
+      return null;
     }
-    console.log('[Speakora auth] Automatic login succeeded', { userId:autoLogin.data.user && autoLogin.data.user.id });
-    await handleAuthenticated(autoLogin.data.session);
-    return;
-  }
-  console.log('[Speakora auth] Signup and automatic login succeeded', { userId:data.user && data.user.id });
-  await handleAuthenticated(data.session);
-});
-
-/* ============ ONBOARDING WIRING ============ */
-function populateDialSelect(){
-  const sel = $('#onboardDial');
-  sel.innerHTML = DIAL_CODES.map(d => `<option value="${d.dial}">${d.dial} ${d.name}</option>`).join('');
-  sel.value = '+254'; // sensible default for this build's target market
-}
-populateDialSelect();
-
-$('#onboardForm').addEventListener('submit', async e=>{
-  e.preventDefault();
-  const msgEl = $('#onboardMsg'); msgEl.className = 'auth-msg';
-  const name = $('#onboardName').value.trim();
-  const dial = $('#onboardDial').value;
-  const rest = $('#onboardPhone').value.trim().replace(/[\s\-().]/g,'').replace(/^0+/, '');
-  if(!/^[0-9]{4,14}$/.test(rest)){
-    msgEl.textContent = 'Enter a valid phone number (digits only, no leading 0).';
-    msgEl.className = 'auth-msg show error';
-    return;
-  }
-  const phone = dial + rest;
-  const btn = $('#onboardBtn');
-  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving…';
-
-  const country = countryFromPhone(phone);
-  const { data, error } = await sb.from('profiles').update({
-    display_name: name,
-    phone: phone,
-    dial_code: dial,
-    country_code: country ? country.iso : null,
-    country_name: country ? country.name : null,
-  }).eq('id', me.id).select().single();
-
-  btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-check"></i> Start chatting';
-
-  if(error){
-    msgEl.textContent = error.code === '23505'
-      ? 'That phone number is already registered to another account.'
-      : error.message;
-    msgEl.className = 'auth-msg show error';
-    return;
-  }
-  myProfile = data;
-  enterApp();
-});
-
-$('#onboardName').addEventListener('input', e=>{
-  $('#onboardAvatarPreview').textContent = initials(e.target.value) || '?';
-});
-
-/* ============ SESSION BOOTSTRAP ============ */
-async function handleAuthenticated(sess){
-  session = sess;
-  me = sess.user;
-  console.log('[Speakora auth] Loading profile', { userId:me && me.id });
-  const { data: profile, error } = await sb.from('profiles').select('*').eq('id', me.id).single();
-  if(error || !profile){
-    console.error('[Speakora auth] Profile load failed', {
-      userId:me && me.id, status:error && error.status, code:error && error.code, message:error && error.message
-    });
-    showToast("Couldn't load your profile. Try logging in again.");
-    return;
-  }
-  console.log('[Speakora auth] Profile loaded', { userId:me.id, onboarded:!!profile.phone });
-  myProfile = profile;
-  if(!myProfile.phone){
-    goToOnboarding();
-  } else {
-    enterApp();
-  }
-}
-
-function goToOnboarding(){
-  authScreen.classList.add('hidden');
-  app.classList.add('hidden');
-  onboardingScreen.classList.remove('hidden');
-  $('#onboardAvatarPreview').textContent = initials(myProfile.email);
-}
-
-async function enterApp(){
-  authScreen.classList.add('hidden');
-  onboardingScreen.classList.add('hidden');
-  app.classList.remove('hidden');
-
-  const country = countryFromPhone(myProfile.phone);
-  $('#meAvatar').style.background = avatarColor(myProfile.id);
-  $('#meAvatar').textContent = initials(myProfile.display_name || myProfile.email);
-  $('#meName').textContent = myProfile.display_name || myProfile.email;
-  $('#meSub').textContent = country ? `${myProfile.phone} · ${country.name}` : myProfile.phone;
-
-  await loadConversations();
-  subscribeToConversations();
-  subscribeToPresence();
-  subscribeToInboxMessages();
-  subscribeToRecontactRequests();
-  await checkPendingRecontactRequests();
-  clearInterval(recontactPollTimer);
-  recontactPollTimer = setInterval(checkPendingRecontactRequests, 10000);
-  await handleContactLink();
-}
-
-function subscribeToInboxMessages(){
-  if(inboxMessagesChannel) sb.removeChannel(inboxMessagesChannel);
-  inboxMessagesChannel = sb.channel('inbox-messages-' + me.id)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages' }, payload=>{
-      const message = payload.new;
-      if(!message || message.sender_id === me.id) return;
-      if(activeConvo && activeConvo.id === message.conversation_id) return;
-      animateNotification('other');
-      loadConversations();
-    })
-    .subscribe();
-}
-
-function subscribeToRecontactRequests(){
-  if(recontactChannel) sb.removeChannel(recontactChannel);
-  recontactChannel = sb.channel('recontact-' + me.id)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'conversation_recontact_requests', filter:`recipient_id=eq.${me.id}` }, payload=>showRecontactPrompt(payload.new))
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`recipient_id=eq.${me.id}` }, payload=>showRecontactPrompt(payload.new))
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'conversation_recontact_requests', filter:`requester_id=eq.${me.id}` }, payload=>{
-      const req=payload.new;
-      if(req.status==='rejected'){
-        try{ localStorage.setItem(recontactNoticeKey(req.conversation_id), JSON.stringify({ at:req.responded_at || new Date().toISOString() })); }catch(e){}
-        showToast('Your request to restart this chat was rejected.');
-        loadConversations().then(()=>{ const convo=conversations.find(c=>c.id===req.conversation_id); if(convo){ convo._recontactRejected=true; openConversation(convo); } });
-      } else if(req.status==='allowed'){
-        try{ localStorage.removeItem(recontactNoticeKey(req.conversation_id)); }catch(e){}
-        loadConversations().then(()=>{
-          const convo=conversations.find(c=>c.id===req.conversation_id);
-          if(convo && activeConvo && activeConvo.id===convo.id){
-            activeConvo._recontactRejected=false;
-            activeConvo._recontactAllowed=true;
-            openConversation(convo);
-          }
-        });
-        showToast('Your chat request was allowed. You can continue chatting.');
-      }
-    }).subscribe();
-}
-
-async function checkPendingRecontactRequests(){
-  const {data,error}=await sb.from('conversation_recontact_requests')
-    .select('*').eq('recipient_id',me.id).eq('status','pending')
-    .order('created_at',{ascending:false}).limit(1);
-  if(error){
-    console.warn('[Speakora recontact] Could not load pending requests', error);
-    return;
-  }
-  if(data && data[0]) showRecontactPrompt(data[0]);
-}
-
-async function showRecontactPrompt(request){
-  if(!request || request.status!=='pending') return;
-  if(activeRecontactRequest && activeRecontactRequest.id===request.id) return;
-  activeRecontactRequest=request;
-  const {data}=await sb.from('profiles').select('display_name,phone').eq('id',request.requester_id).maybeSingle();
-  const name=(data && (data.display_name||data.phone)) || 'Someone';
-  $('#recontactTitle').textContent=`${name} wants to chat again`;
-  $('#recontactText').textContent=`${name} deleted this chat and is trying to contact you again. Allow to restore the latest 10 messages, or reject.`;
-  $('#recontactScrim').classList.add('show');
-}
-
-async function openRejectedContacts(){
-  moreMenu.classList.remove('show');
-  moreBtn.setAttribute('aria-expanded','false');
-  const box = $('#rejectedContactsList');
-  box.innerHTML = '<div class="discover-empty"><i class="fa-solid fa-spinner fa-spin"></i> Loading…</div>';
-  $('#rejectedContactsScrim').classList.add('show');
-  const { data: requests, error } = await sb.from('conversation_recontact_requests')
-    .select('id,conversation_id,requester_id,request_count,created_at')
-    .eq('recipient_id', me.id).eq('status','rejected')
-    .order('created_at', { ascending:false });
-  if(error){
-    box.innerHTML = '<div class="discover-empty">Run the latest migration_recontact.sql in Supabase SQL Editor first.</div>';
-    return;
-  }
-  if(!requests || !requests.length){
-    box.innerHTML = '<div class="discover-empty">No rejected contacts.</div>';
-    return;
-  }
-  const ids = [...new Set(requests.map(r=>r.requester_id))];
-  const { data: profiles } = await sb.from('profiles').select('*').in('id', ids);
-  const byId = new Map((profiles || []).map(p=>[p.id,p]));
-  box.innerHTML = requests.map(request=>{
-    const profile = byId.get(request.requester_id) || {};
-    const name = profile.display_name || profile.phone || 'Speakora user';
-    const count = Math.max(1, Number(request.request_count) || 1);
-    return `<div class="rejected-contact-row" data-rejected-request="${request.id}">
-      <div class="avatar" style="background:${avatarColor(profile.id || request.requester_id)}">${initials(name)}</div>
-      <div class="rejected-contact-info"><div class="rejected-contact-name">${escapeHtml(name)}</div><div class="rejected-contact-meta">${escapeHtml(profile.phone || '')} · ${count} reconnect attempt${count===1?'':'s'}</div></div>
-      <div class="rejected-contact-actions"><button type="button" class="rejected-contact-accept" data-accept-recontact="${request.id}">Accept</button></div>
-    </div>`;
-  }).join('');
-  box.querySelectorAll('[data-accept-recontact]').forEach(btn=>btn.addEventListener('click', async ()=>{
-    btn.disabled = true;
-    const { data, error: acceptError } = await sb.rpc('allow_recontact_from_history', { p_request_id:btn.dataset.acceptRecontact });
-    if(acceptError){
-      btn.disabled = false;
-      showToast(acceptError.code === 'PGRST202' ? 'Run the latest migration_recontact.sql in Supabase SQL Editor first.' : (acceptError.message || 'Could not accept contact.'));
-      return;
-    }
-    const convoId = data && data.conversation_id;
-    $('#rejectedContactsScrim').classList.remove('show');
-    await loadConversations();
-    const convo = conversations.find(c=>c.id===convoId);
-    if(convo){ convo._recontactAllowed=true; convo._recontactRejected=false; await openConversation(convo); }
-    showToast('Contact accepted. Chat restored.');
-  }));
-}
-
-function appendRejectedNotice(){
-  if(!activeConvo) return;
-  const stored = localStorage.getItem(recontactNoticeKey(activeConvo.id));
-  if(!stored) return;
-  const box=$('#messages');
-  if(!box || box.querySelector('.rejected-notice')) return;
-  let rejectedAt = null;
-  try{ rejectedAt = JSON.parse(stored).at || null; }catch(e){}
-  const notice = document.createElement('div');
-  notice.className = 'rejected-notice';
-  notice.textContent = 'Your request to restart this chat was rejected.';
-  const rows = [...box.querySelectorAll('.msg-row')];
-  const afterRejection = rejectedAt && rows.find(row=>{
-    const message = messageCache.get(row.dataset.id);
-    return message && new Date(message.created_at) > new Date(rejectedAt);
-  });
-  if(afterRejection) box.insertBefore(notice, afterRejection);
-  else {
-    const firstMessage = rows[0];
-    if(firstMessage) box.insertBefore(notice, firstMessage);
-    else box.appendChild(notice);
-  }
-}
-
-async function handleContactLink(){
-  if(!pendingContactLink) return;
-  const contactId = pendingContactLink;
-  const expectedKey = btoa(contactId);
-  pendingContactLink = null;
-  if(pendingContactKey !== expectedKey || contactId === me.id) return;
-  pendingContactKey = null;
-  const { data, error } = await sb.from('profiles').select('*').eq('id', contactId).maybeSingle();
-  if(error || !data){ showToast('That contact link is no longer available.'); return; }
-  await startConversationWith(data);
-}
-
-/* ============ CONVERSATIONS ============ */
-async function loadConversations(){
-  const { data, error } = await sb
-    .from('conversations')
-    .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
-    .or(`user_a.eq.${me.id},user_b.eq.${me.id}`)
-    .order('last_message_at', { ascending:false, nullsFirst:false });
-
-  if(error){ showToast('Could not load conversations.'); return; }
-  const { data: hiddenRows } = await sb.from('conversation_hidden').select('conversation_id').eq('user_id', me.id);
-  const hiddenIds = new Set((hiddenRows || []).map(row => row.conversation_id));
-  conversations = (data || []).filter(c => !hiddenIds.has(c.id));
-  updateNotificationBadge();
-  renderConvoList($('#searchInput').value);
-}
-
-function otherParty(convo){
-  return convo.user_a === me.id ? convo.b : convo.a;
-}
-function conversationTitle(convo){ return convo.is_group ? (convo.group_name || 'Group chat') : ((otherParty(convo)||{}).display_name || (otherParty(convo)||{}).phone || 'Unknown'); }
-function myUnreadField(convo){
-  return convo.user_a === me.id ? 'unread_a' : 'unread_b';
-}
-let contactProfileTarget = null;
-function showContactProfile(profile){
-  if(!profile) return;
-  contactProfileTarget = profile;
-  const name = profile.display_name || profile.phone || 'Speakora user';
-  const country = profile.country_name || (countryFromPhone(profile.phone || '') || {}).name || 'Unknown country';
-  $('#contactProfileAvatar').style.background = avatarColor(profile.id || name);
-  $('#contactProfileAvatar').textContent = initials(name);
-  $('#contactProfileName').textContent = name;
-  $('#contactProfileSubtitle').textContent = profile.email || 'Speakora profile';
-  $('#contactProfilePhone').textContent = profile.phone || 'No phone number';
-  $('#contactProfileCountry').textContent = country;
-  $('#contactProfileScrim').classList.add('show');
-}
-function renderGroupInfo(convo, members){
-  const isAdmin = (members || []).some(m => m.id === me.id && m.is_admin);
-  const query = ($('#groupMemberSearch') && $('#groupMemberSearch').value || '').trim().toLowerCase();
-  const visibleMembers = (members || []).filter(m=>!query || (m.display_name||'').toLowerCase().includes(query) || (m.phone||'').includes(query));
-  $('#groupInfoAvatar').style.background = avatarColor(convo.id);
-  $('#groupInfoInitials').textContent = initials(convo.group_name || 'Group');
-  $('#groupInfoName').textContent = convo.group_name || 'Group chat';
-  $('#groupInfoSummary').textContent = `${members.length} member${members.length===1?'':'s'} · ${isAdmin ? 'You are an admin' : 'You are a member'}`;
-  $('#groupInfoDescription').textContent = convo.group_description || 'No group description.';
-  $('#groupInfoEdit').classList.toggle('hidden', !isAdmin);
-  $('#groupInfoNameInput').value = convo.group_name || '';
-  $('#groupMemberPermission').value = convo.members_can_add ? 'all' : 'admin';
-  $('#groupMemberList').innerHTML = visibleMembers.map(member=>{
-    const name = member.display_name || member.phone || 'Speakora user';
-    const admin = !!member.is_admin;
-    const controls = isAdmin && member.id !== me.id
-      ? `<div class="group-member-row-actions"><button type="button" data-group-action="admin" data-user-id="${member.id}" data-admin="${admin}">${admin?'Remove admin':'Make admin'}</button><button type="button" data-group-action="remove" data-user-id="${member.id}">Remove</button></div>` : '';
-    return `<div class="group-member-row" data-member-id="${member.id}" role="button" tabindex="0"><div class="avatar" style="background:${avatarColor(member.id)}">${initials(name)}</div><div class="group-member-row-info"><div class="group-member-row-name">${escapeHtml(name)}${member.id===me.id?' (You)':''}</div><div class="group-member-row-role">${admin?'Admin':'Member'}</div></div>${controls}</div>`;
-  }).join('');
-  $('#groupMemberList').querySelectorAll('.group-member-row').forEach(row=>{
-    const openMember=()=>{ const member=(members||[]).find(p=>p.id===row.dataset.memberId); if(member) showContactProfile(member); };
-    row.addEventListener('click',e=>{ if(e.target.closest('.group-member-row-actions')) return; openMember(); });
-    row.addEventListener('keydown',e=>{ if((e.key==='Enter'||e.key===' ')&&!e.target.closest('button')){e.preventDefault();openMember();} });
-  });
-  $('#groupMemberList').querySelectorAll('[data-group-action]').forEach(btn=>btn.addEventListener('click', async e=>{
-    e.stopPropagation();
-    const action = btn.dataset.groupAction;
-    const uid = btn.dataset.userId;
-    const rpc = action === 'remove' ? 'group_remove_member' : 'group_set_admin';
-    const params = action === 'remove'
-      ? { p_conversation_id: convo.id, p_user_id: uid }
-      : { p_conversation_id: convo.id, p_user_id: uid, p_is_admin: btn.dataset.admin !== 'true' };
-    const { error } = await sb.rpc(rpc, params);
-    if(error){ showToast(error.message || 'Group action failed.'); return; }
-    const refreshed = await loadGroupMembers(convo.id);
-    renderGroupInfo(convo, refreshed);
-    showToast(action === 'remove' ? 'Member removed.' : 'Admin permissions updated.');
-  }));
-  $('#groupInfoScrim').classList.add('show');
-}
-async function copyContactField(value, label){
-  if(!value){ showToast(`No ${label.toLowerCase()} available.`); return; }
-  try{ await navigator.clipboard.writeText(value); showToast(`${label} copied.`); }
-  catch(e){ showToast(`Could not copy ${label.toLowerCase()}.`); }
-}
-async function removeConversation(c){
-  const isLeavingGroup = c.is_group && !leftGroupIds.has(c.id);
-  const rpc = isLeavingGroup ? 'leave_group_conversation' : 'delete_conversation_for_all';
-  let deletedForEveryone = !isLeavingGroup;
-  const { error } = await sb.rpc(rpc, { p_conversation_id:c.id });
-  if(error && !isLeavingGroup && (error.code === 'PGRST202' || /delete_conversation_for_all/i.test(error.message || ''))){
-    const fallback = await sb.rpc('delete_conversation_for_me', { p_conversation_id:c.id });
-    if(fallback.error){ showToast('Run migration_recontact.sql in Supabase SQL Editor first.'); return; }
-    deletedForEveryone = false;
-  } else if(error){ showToast('This action needs the conversation actions migration.'); return; }
-  if(activeConvo && activeConvo.id === c.id){ closeChatView(); activeConvo=null; }
-  if(isLeavingGroup){ leftGroupIds.add(c.id); saveLeftGroups(); }
-  await loadConversations();
-  showToast(isLeavingGroup ? 'You left the group. Choose the menu again to delete it.' : (c.is_group ? 'Group deleted from your chats.' : (deletedForEveryone ? 'Chat deleted for everyone.' : 'Chat deleted for you.')));
-}
-
-function renderConvoList(filter){
-  const list = $('#convoItems');
-  const term = (filter||'').toLowerCase();
-  const filtered = conversations.filter(c=>{
-    const other = otherParty(c);
-    const matchesSearch = !term || (other.display_name||'').toLowerCase().includes(term) || (other.phone||'').includes(term) || (c.group_name||'').toLowerCase().includes(term);
-    const isGroup = !!c.is_group;
-    const matchesFilter = activeChatFilter==='all' || (activeChatFilter==='normal'&&!isGroup) || (activeChatFilter==='groups'&&isGroup) || (activeChatFilter==='favorites'&&favoriteConversationIds.has(c.id));
-    return matchesSearch && matchesFilter;
-  });
-
-  if(!filtered.length){
-    list.innerHTML = `<div class="empty-list">No conversations yet.<br>Tap the message icon above and enter a phone number to start one.</div>`;
-    return;
   }
 
-  list.innerHTML = '';
-  filtered.forEach(c=>{
-    const other = otherParty(c);
-    const unread = isRejectedConversation(c) ? 0 : (c[myUnreadField(c)] || 0);
-    const isOnline = !!onlinePeers[other.id];
-    const avatarSeed = c.is_group ? c.id : (other.id || c.id);
-    const previewPrefix = c.last_message_sender_id === me.id ? 'You: ' : '';
-    const preview = c.last_message_body ? previewPrefix + c.last_message_body : 'Say hello 👋';
-    const item = document.createElement('div');
-    item.className = 'convo' + (activeConvo && activeConvo.id===c.id ? ' active' : '');
-    item.innerHTML = `
-      <div class="avatar" style="background:${avatarColor(avatarSeed)}">${c.is_group ? '<i class="fa-solid fa-users"></i>' : initials(other.display_name||other.phone)}${isOnline?'<span class="dot"></span>':''}</div>
-      <div class="convo-body">
-        <div class="convo-top">
-          <div class="convo-name">${escapeHtml(conversationTitle(c))}</div>
-          <div class="convo-time">${timeLabel(c.last_message_at)}</div>
-        </div>
-        <div class="convo-bottom">
-          <div class="convo-preview">${escapeHtml(preview)}</div>
-          <div class="convo-meta">
-            <button type="button" class="favorite-toggle ${favoriteConversationIds.has(c.id)?'active':''}" title="Favorite"><i class="fa-${favoriteConversationIds.has(c.id)?'solid':'regular'} fa-star"></i></button>
-            <div class="convo-row-contact">
-              <button type="button" class="convo-contact-btn" title="Contact options" aria-label="Contact options" aria-expanded="false"><i class="fa-solid fa-ellipsis-vertical"></i></button>
-              <div class="chat-contact-menu convo-row-menu">
-                <button type="button" data-action="view"><i class="fa-solid fa-user"></i> View contact</button>
-                <button type="button" data-action="share"><i class="fa-solid fa-share-nodes"></i> Share number</button>
-                <button type="button" data-action="save"><i class="fa-regular fa-address-card"></i> Save contact</button>
-                <button type="button" data-action="delete"><i class="fa-solid fa-trash"></i> ${c.is_group ? (leftGroupIds.has(c.id) ? 'Delete group chat' : 'Exit group') : 'Delete chat'}</button>
-              </div>
-            </div>
-            ${other.country_code ? `<span class="lang-pill">${other.country_code}</span>` : ''}
-            ${unread ? `<span class="unread">${unread}</span>` : ''}
-          </div>
-        </div>
-      </div>`;
-    item.addEventListener('click', ()=> openConversation(c));
-    item.querySelector('.favorite-toggle').addEventListener('click', e=>{ e.stopPropagation(); if(favoriteConversationIds.has(c.id)) favoriteConversationIds.delete(c.id); else favoriteConversationIds.add(c.id); saveFavorites(); renderConvoList($('#searchInput').value); });
-    const contactWrap = item.querySelector('.convo-row-contact');
-    const contactBtn = contactWrap.querySelector('.convo-contact-btn');
-    const contactMenu = contactWrap.querySelector('.convo-row-menu');
-    contactBtn.addEventListener('click', e=>{
-      e.stopPropagation();
-      document.querySelectorAll('.convo-row-menu.show').forEach(menu=>{ if(menu!==contactMenu) menu.classList.remove('show'); });
-      const open = contactMenu.classList.toggle('show');
-      contactBtn.setAttribute('aria-expanded', String(open));
-    });
-    contactMenu.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click', async e=>{
-      e.stopPropagation();
-      const p = otherParty(c); if(!p) return;
-      const action = button.dataset.action;
-      if(action === 'view'){
-        showContactProfile(p);
-      } else if(action === 'share'){
-        if(!p.phone){ showToast('This contact has no phone number.'); }
-        else { try{ if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.'); }catch(err){} }
-      } else if(action === 'save'){
-        if(!p.phone){ showToast('This contact has no phone number.'); }
-        else {
-          const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`;
-          const url=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'}));
-          const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click();
-          URL.revokeObjectURL(url); showToast('Contact file created.');
-        }
-      } else if(action === 'delete'){
-        await removeConversation(c);
-      }
-      contactMenu.classList.remove('show'); contactBtn.setAttribute('aria-expanded','false');
-    }));
-    list.appendChild(item);
-  });
-}
-$('#searchInput').addEventListener('input', e=> renderConvoList(e.target.value));
-$('#chatFilterTabs').addEventListener('click', e=>{ const b=e.target.closest('button[data-filter]'); if(!b)return; activeChatFilter=b.dataset.filter; document.querySelectorAll('#chatFilterTabs button').forEach(x=>x.classList.toggle('active',x===b)); renderConvoList($('#searchInput').value); });
-document.addEventListener('click', e=>{
-  if(!e.target.closest('.convo-row-contact')){
-    document.querySelectorAll('.convo-row-menu.show').forEach(menu=>menu.classList.remove('show'));
-    document.querySelectorAll('.convo-contact-btn[aria-expanded="true"]').forEach(btn=>btn.setAttribute('aria-expanded','false'));
-  }
-});
+  var adminOverviewCache = [];
 
-function subscribeToConversations(){
-  if(conversationsChannel) sb.removeChannel(conversationsChannel);
-  conversationsChannel = sb.channel('conversations-watch')
-    .on('postgres_changes', { event:'*', schema:'public', table:'conversations' }, payload=>{
-      const row = payload.new || payload.old;
-      if(row && (row.user_a === me.id || row.user_b === me.id)){
-        if(payload.event === 'UPDATE' && row.last_message_sender_id && row.last_message_sender_id !== me.id){
-          animateNotification(activeConvo && row.id === activeConvo.id ? 'same' : 'other');
-        }
-        loadConversations();
-        if(activeConvo && row.id === activeConvo.id){
-          activeConvo = { ...activeConvo, ...payload.new };
-        }
-      }
-    })
-    .subscribe();
-}
-
-function subscribeToPresence(){
-  presenceChannel = sb.channel('online-users', { config: { presence: { key: me.id } } });
-  presenceChannel.on('presence', { event:'sync' }, ()=>{
-    onlinePeers = presenceChannel.presenceState();
-    renderConvoList($('#searchInput').value);
-    if(activeConvo) updateChatHeaderStatus();
-  });
-  presenceChannel.subscribe(async status=>{
-    if(status === 'SUBSCRIBED') await presenceChannel.track({ online:true });
-  });
-}
-
-async function loadGroupMembers(conversationId){
-  const { data, error } = await sb.from('conversation_members')
-    .select('user_id,is_admin,profiles(*)').eq('conversation_id', conversationId);
-  if(error) return [];
-  const members = (data || []).map(row => ({ ...(row.profiles || { id: row.user_id }), is_admin: !!row.is_admin })).filter(Boolean);
-  groupMembersCache.set(conversationId, members);
-  return members;
-}
-
-/* ============ ACTIVE CONVERSATION ============ */
-async function openConversation(convo){
-  // Add one browser-history step when entering a chat so Back returns to the
-  // conversation list without leaving the app.
-  if(!app.classList.contains('show-chat')){
-    history.pushState({ ...(history.state || {}), speakoraChat: convo.id }, '', location.href);
-  }
-  activeConvo = convo;
-  msgInput.disabled = false;
-  sendBtn.disabled = true;
-  renderedMessageIds = new Set();
-  $('#emptyState').style.display = 'none';
-  $('#chatContent').style.display = 'flex';
-  app.classList.add('show-chat');
-
-  const other = otherParty(convo) || {};
-  if(convo.is_group){
-    const members = await loadGroupMembers(convo.id);
-    const canAddMembers = !!convo.members_can_add || members.some(m=>m.id===me.id && m.is_admin);
-    $('#chatAvatar').style.background = avatarColor(convo.id);
-    $('#chatAvatar').innerHTML = '<i class="fa-solid fa-users"></i>';
-    $('#chatName').textContent = convo.group_name || 'Group chat';
-    $('#chatStatus').textContent = `${members.length || 0} member${members.length === 1 ? '' : 's'}`;
-    $('#viewContactBtn').classList.add('hidden');
-    $('#shareContactNumberBtn').classList.add('hidden');
-    $('#saveContactBtn').classList.add('hidden');
-    $('#groupInfoBtn').classList.remove('hidden');
-    $('#groupAddMemberBtn').classList.toggle('hidden', !canAddMembers);
-  } else {
-    $('#chatAvatar').style.background = avatarColor(other.id || convo.id);
-    $('#chatAvatar').textContent = initials(other.display_name || other.phone);
-    $('#chatName').textContent = other.display_name || other.phone || 'Unknown';
-    $('#viewContactBtn').classList.remove('hidden');
-    $('#shareContactNumberBtn').classList.remove('hidden');
-    $('#saveContactBtn').classList.remove('hidden');
-    $('#groupInfoBtn').classList.add('hidden');
-    $('#groupAddMemberBtn').classList.add('hidden');
-  }
-  $('#deleteCurrentChatBtn').innerHTML = `<i class="fa-solid fa-trash"></i> ${convo.is_group ? (leftGroupIds.has(convo.id) ? 'Delete group chat' : 'Exit group') : 'Delete chat'}`;
-  updateChatHeaderStatus();
-
-  // clear my unread counter locally + on the server, then paint the sidebar
-  const field = myUnreadField(convo);
-  if(convo[field]){
-    convo[field] = 0;
-    const localConvo = conversations.find(c=>c.id===convo.id);
-    if(localConvo) localConvo[field] = 0;
-    updateNotificationBadge();
-    await sb.rpc('mark_conversation_read', { p_conversation_id: convo.id });
-  }
-  renderConvoList($('#searchInput').value);
-
-  await loadMessages(convo.id, !!convo._recontactAllowed);
-  convo._recontactAllowed = false;
-  subscribeToMessages(convo.id);
-}
-
-function closeChatView(){
-  app.classList.remove('show-chat');
-  $('#chatContent').style.display = 'none';
-  $('#emptyState').style.display = 'flex';
-}
-
-window.addEventListener('popstate', ()=>{
-  if(!history.state || !history.state.speakoraChat) closeChatView();
-});
-
-function updateChatHeaderStatus(){
-  if(!activeConvo) return;
-  if(activeConvo.is_group){
-    const members = groupMembersCache.get(activeConvo.id) || [];
-    $('#chatStatus').classList.remove('typing');
-    $('#chatStatus').textContent = `${members.length || 0} member${members.length === 1 ? '' : 's'}`;
-    return;
-  }
-  const other = otherParty(activeConvo);
-  const isOnline = !!onlinePeers[other.id];
-  const country = other.country_name ? ` · ${other.country_name}` : '';
-  $('#chatStatus').innerHTML = isOnline
-    ? `<span class="dot-online"></span> online${country}`
-    : (other.country_name || '');
-}
-
-async function loadMessages(conversationId, latestOnly=false){
-  let messageQuery = sb
-    .from('messages')
-    .select('*')
-    .eq('conversation_id', conversationId);
-  const { data, error } = latestOnly
-    ? await messageQuery.order('created_at', { ascending:false }).limit(10)
-    : await messageQuery.order('created_at', { ascending:true });
-
-  if(error){ showToast('Could not load messages.'); return; }
-  const { data: hiddenRows } = await sb.from('message_hidden').select('message_id').eq('user_id', me.id);
-  const hiddenIds = new Set((hiddenRows || []).map(row => row.message_id));
-  const visibleMessages = (data || []).filter(message => !hiddenIds.has(message.id)).sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
-
-  const box = $('#messages');
-  box.innerHTML = '';
-  box.insertAdjacentHTML('afterbegin','<div class="message-search-bar" id="messageSearchBar"><i class="fa-solid fa-magnifying-glass"></i><input id="messageSearchInput" type="search" placeholder="Search messages…" autocomplete="off"><button type="button" class="message-search-close" id="closeMessageSearch" aria-label="Close message search"><i class="fa-solid fa-xmark"></i></button></div>');
-  bindMessageSearch();
-  messageCache.clear();
-  clearMessageSelection();
-  const pinnedBar = document.createElement('div');
-  pinnedBar.className = 'pinned-bar';
-  pinnedBar.id = 'pinnedMessagesBar';
-  box.appendChild(pinnedBar);
-  const chip = document.createElement('div');
-  chip.className = 'date-chip';
-  chip.textContent = 'Today';
-  box.appendChild(chip);
-
-  visibleMessages.forEach(m=>{
-    renderedMessageIds.add(m.id);
-    box.appendChild(renderMessageRow(m));
-  });
-  renderPinnedMessages(visibleMessages);
-  appendRejectedNotice();
-  scrollBottom();
-
-  // mark their unread messages as read
-  const unreadIncoming = visibleMessages.filter(m => m.sender_id !== me.id && m.status !== 'read');
-  if(unreadIncoming.length){
-    sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{});
-  }
-}
-
-function bindMessageSearch(){
-  const input=$('#messageSearchInput');
-  if(!input || input.dataset.bound) return;
-  input.dataset.bound='1';
-  input.addEventListener('input',()=>{
-    const q=input.value.trim().toLowerCase();
-    document.querySelectorAll('#messages .message-search-hit').forEach(mark=>mark.replaceWith(document.createTextNode(mark.textContent)));
-    document.querySelectorAll('#messages .msg-row').forEach(row=>{
-      const text=(row.querySelector('.msg-text')||{}).textContent || '';
-      const match=!!q && text.toLowerCase().includes(q);
-      row.classList.toggle('hidden', !!q && !match);
-      if(match) highlightMessageText(row.querySelector('.msg-text'), q);
-    });
-  });
-  $('#closeMessageSearch').addEventListener('click',()=>{ input.value=''; document.querySelectorAll('#messages .message-search-hit').forEach(mark=>mark.replaceWith(document.createTextNode(mark.textContent))); document.querySelectorAll('#messages .msg-row').forEach(row=>row.classList.remove('hidden')); $('#messageSearchBar').classList.remove('show'); });
-}
-function highlightMessageText(root, query){
-  if(!root || !query) return;
-  const walker=document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
-  nodes.forEach(node=>{
-    const value=node.nodeValue, lower=value.toLowerCase(); let start=0, idx;
-    const frag=document.createDocumentFragment();
-    while((idx=lower.indexOf(query,start))!==-1){ frag.append(document.createTextNode(value.slice(start,idx))); const mark=document.createElement('mark'); mark.className='message-search-hit'; mark.textContent=value.slice(idx,idx+query.length); frag.append(mark); start=idx+query.length; }
-    if(start){ frag.append(document.createTextNode(value.slice(start))); node.replaceWith(frag); }
-  });
-}
-
-function renderPinnedMessages(messages){
-  const bar = $('#pinnedMessagesBar');
-  if(!bar) return;
-  const pinned = (messages || []).filter(m=>m.pinned_at && !m.deleted_at);
-  bar.innerHTML = pinned.length
-    ? `<div class="pinned-heading"><i class="fa-solid fa-thumbtack"></i> Pinned messages</div>`
-      + pinned.map(m=>`<button type="button" class="pinned-item" data-pinned-id="${m.id}">${escapeHtml(m.body)}</button>`).join('')
-    : '';
-  bar.classList.toggle('show', pinned.length > 0);
-  bar.querySelectorAll('.pinned-item').forEach(item=>item.addEventListener('click', ()=>{
-    const row = $(`.msg-row[data-id="${item.dataset.pinnedId}"]`);
-    if(!row) return;
-    row.scrollIntoView({ behavior:'smooth', block:'center' });
-    row.classList.add('selected');
-    setTimeout(()=>row.classList.remove('selected'), 1400);
-  }));
-}
-function refreshPinnedMessagesBar(){ renderPinnedMessages([...messageCache.values()]); }
-
-function renderMessageRow(m){
-  messageCache.set(m.id, m);
-  const row = document.createElement('div');
-  row.className = 'msg-row ' + (m.sender_id === me.id ? 'me' : 'them');
-  row.dataset.id = m.id;
-  const ticks = m.status === 'read' ? 'fa-check-double read' : 'fa-check';
-  const sender = m.sender_id === me.id ? myProfile : (activeConvo && activeConvo.is_group
-    ? (groupMembersCache.get(activeConvo.id) || []).find(p=>p.id===m.sender_id)
-    : (activeConvo ? otherParty(activeConvo) : null));
-  const senderName = sender && (sender.display_name || sender.phone) || 'User';
-  // Use the same profile id as the chat header for one-to-one conversations.
-  // Group messages keep the sender's own stable profile color.
-  const senderColorSeed = activeConvo && !activeConvo.is_group
-    ? ((otherParty(activeConvo) || {}).id || m.sender_id)
-    : ((sender && sender.id) || m.sender_id);
-  const senderAvatar = m.sender_id === me.id || !activeConvo?.is_group ? '' : `<div class="avatar msg-sender-avatar" style="background:${avatarColor(senderColorSeed)}" title="${escapeHtml(senderName)}">${initials(senderName)}${onlinePeers[m.sender_id] ? '<span class="dot"></span>' : ''}</div>`;
-  row.innerHTML = `
-    ${senderAvatar}
-    <div class="bubble-wrap">
-      <div class="bubble">
-        <div class="msg-text">${linkifyMessageBody(m.body)}</div>
-        <div class="msg-meta">
-          <span>${timeLabel(m.created_at)}${m.edited_at ? '<span class="msg-edited">edited</span>' : ''}</span>
-          ${m.sender_id===me.id ? `<span class="ticks ${m.status==='read'?'read':''}"><i class="fa-solid ${ticks.replace(' read','')}"></i></span>` : ''}
-        </div>
-      </div>
-    </div>`;
-  row.addEventListener('click', e=>{
-    if(e.target.closest('button,a,input,textarea')) return;
-    toggleMessageSelection(m.id);
-  });
-  row.querySelectorAll('.phone-link').forEach(btn=>btn.addEventListener('click', async e=>{
-    e.stopPropagation();
-    const { data } = await sb.from('profiles').select('*').eq('phone', btn.dataset.phone).maybeSingle();
-    if(data) showContactProfile(data); else showToast('No Speakora profile found for this number.');
-  }));
-  if(m.pinned_at) row.classList.add('pinned');
-  if(m.deleted_at) row.classList.add('deleted');
-  return row;
-}
-function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
-function linkifyMessageBody(body){
-  const escaped = escapeHtml(body);
-  return escaped.replace(/(\+\d[\d\s().-]{5,}\d)/g, match=>{
-    const phone = normalizePhone(match);
-    return `<button type="button" class="phone-link" data-phone="${phone}">${match}</button>`;
-  });
-}
-function scrollBottom(){ const box = $('#messages'); requestAnimationFrame(()=>{ box.scrollTop = box.scrollHeight; }); }
-
-async function editSelectedMessage(){
-  const id = [...selectedMessageIds][0], message = messageCache.get(id);
-  if(!message || message.sender_id !== me.id) return;
-  const body = window.prompt('Edit message:', message.body);
-  if(body === null || !body.trim() || body.trim() === message.body) return;
-  const { data, error } = await sb.rpc('edit_message', { p_message_id:id, p_body:body.trim() });
-  if(error){ showToast('Could not edit message.'); return; }
-  messageCache.set(id, Array.isArray(data) ? data[0] : (data || { ...message, body:body.trim(), edited_at:new Date().toISOString() }));
-  const row = $(`.msg-row[data-id="${id}"]`);
-  if(row){ row.querySelector('.msg-text').textContent = body.trim(); row.classList.remove('selected'); }
-  refreshPinnedMessagesBar();
-  clearMessageSelection();
-}
-function chooseDeleteMode(ownOnly){
-  return new Promise(resolve=>{
-    const scrim=$('#deleteChoiceScrim'), allBtn=$('#deleteForAllChoice'), meBtn=$('#deleteForMeChoice');
-    $('#deleteChoiceHint').textContent = ownOnly
-      ? 'Delete this message for everyone, or only remove it from your view.'
-      : 'You can only remove someone else’s message from your own view.';
-    allBtn.style.display = ownOnly ? 'block' : 'none';
-    scrim.classList.add('show');
-    let done=false;
-    const finish=mode=>{ if(done)return; done=true; scrim.classList.remove('show'); resolve(mode); };
-    allBtn.onclick=()=>finish('all');
-    meBtn.onclick=()=>finish('me');
-    $('#cancelDeleteChoice').onclick=()=>finish(null);
-    $('#closeDeleteChoice').onclick=()=>finish(null);
-    scrim.onclick=e=>{ if(e.target===scrim) finish(null); };
-  });
-}
-async function deleteSelectedMessages(){
-  const ids = [...selectedMessageIds];
-  if(!ids.length) return;
-  const ownOnly = ids.every(id => (messageCache.get(id)||{}).sender_id === me.id);
-  const deleteMode = await chooseDeleteMode(ownOnly);
-  if(!deleteMode) return;
-  const deleteForAll = deleteMode === 'all';
-  for(const id of ids){
-    const rpc = deleteForAll ? 'delete_message_for_all' : 'delete_message_for_me';
-    const { error } = await sb.rpc(rpc, { p_message_id:id });
-    if(error){
-      const missingDeleteRpc = error.code === 'PGRST202' || /delete_message_for_(all|me)/i.test(error.message || '');
-      showToast(missingDeleteRpc
-        ? 'Delete is not configured. Run migration_harden_rls.sql in Supabase SQL Editor.'
-        : (error.message || 'Some messages could not be deleted.'));
-      continue;
-    }
-    const row = $(`.msg-row[data-id="${id}"]`);
-    if(deleteForAll){
-      const message = messageCache.get(id) || {};
-      message.body = 'This message was deleted'; message.deleted_at = new Date().toISOString();
-      messageCache.set(id, message);
-      if(row){ row.querySelector('.msg-text').textContent = message.body; row.classList.add('deleted'); }
-    } else {
-      if(row) row.remove();
-      messageCache.delete(id);
-    }
-    selectedMessageIds.delete(id);
-  }
-  clearMessageSelection();
-  refreshPinnedMessagesBar();
-  loadConversations();
-}
-async function pinSelectedMessage(){
-  const id = [...selectedMessageIds][0]; if(!id) return;
-  const message = messageCache.get(id) || {};
-  const rpc = message.pinned_at ? 'unpin_message' : 'pin_message';
-  const { data, error } = await sb.rpc(rpc, { p_message_id:id });
-  if(error){ showToast('Could not pin message.'); return; }
-  const updated = { ...message, ...(Array.isArray(data) ? data[0] : data) };
-  messageCache.set(id, updated);
-  const row = $(`.msg-row[data-id="${id}"]`); if(row) row.classList.toggle('pinned', !!updated.pinned_at);
-  refreshPinnedMessagesBar();
-  clearMessageSelection(); showToast(updated.pinned_at ? 'Message pinned.' : 'Message unpinned.');
-}
-async function forwardSelectedMessage(){
-  const id = [...selectedMessageIds][0]; if(!id) return;
-  const choices = conversations.filter(c=>!activeConvo || c.id !== activeConvo.id);
-  if(!choices.length){ showToast('No other conversation to forward to.'); return; }
-  const labels = choices.map((c,i)=>`${i+1}. ${otherParty(c).display_name || otherParty(c).phone || 'Unknown'}`).join('\n');
-  const answer = window.prompt(`Forward to:\n${labels}\n\nEnter a number:`);
-  const index = Number(answer) - 1;
-  if(!Number.isInteger(index) || !choices[index]) return;
-  const { error } = await sb.rpc('forward_message', { p_message_id:id, p_target_conversation_id:choices[index].id });
-  if(error){ showToast('Could not forward message.'); return; }
-  clearMessageSelection(); showToast('Message forwarded.');
-}
-$('#editMessageBtn').addEventListener('click', editSelectedMessage);
-$('#deleteMessageBtn').addEventListener('click', deleteSelectedMessages);
-$('#forwardMessageBtn').addEventListener('click', forwardSelectedMessage);
-$('#pinMessageBtn').addEventListener('click', pinSelectedMessage);
-$('#copyMessageBtn').addEventListener('click', async ()=>{
-  const message = messageCache.get([...selectedMessageIds][0]);
-  if(!message) return;
-  try{ await navigator.clipboard.writeText(message.body); showToast('Message copied.'); }
-  catch(e){ window.prompt('Copy message:', message.body); }
-});
-$('#clearMessageSelection').addEventListener('click', clearMessageSelection);
-
-function subscribeToMessages(conversationId){
-  if(messagesChannel) sb.removeChannel(messagesChannel);
-  messagesChannel = sb.channel('messages-' + conversationId)
-    .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
-      const m = payload.new;
-      if(renderedMessageIds.has(m.id)) return;
-      renderedMessageIds.add(m.id);
-      $('#messages').appendChild(renderMessageRow(m));
-      scrollBottom();
-      if(m.sender_id !== me.id){
-        hideTyping();
-        // The chat is already open, so consume the notification immediately
-        // and refresh the sidebar badge without requiring a reopen.
-        animateNotification('same');
-        const readField = myUnreadField(activeConvo || {});
-        if(activeConvo && activeConvo.id === conversationId) activeConvo[readField] = 0;
-        sb.rpc('mark_messages_read', { p_conversation_id: conversationId }).then(()=>{
-          if(activeConvo && activeConvo.id === conversationId) activeConvo[readField] = 0;
-          loadConversations();
-          updateNotificationBadge();
-        });
-      }
-    })
-    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
-      const m = payload.new;
-      messageCache.set(m.id, m);
-      const row = $(`.msg-row[data-id="${m.id}"]`);
-      if(row){
-        const tick = row.querySelector('.ticks');
-        if(tick){ tick.classList.toggle('read', m.status==='read'); tick.innerHTML = `<i class="fa-solid fa-check-double"></i>`; }
-        row.querySelector('.msg-text').textContent = m.body;
-        const time = row.querySelector('.msg-meta > span');
-        if(time && m.edited_at && !time.querySelector('.msg-edited')) time.insertAdjacentHTML('beforeend','<span class="msg-edited">edited</span>');
-        row.classList.toggle('pinned', !!m.pinned_at);
-        row.classList.toggle('deleted', !!m.deleted_at);
-        refreshPinnedMessagesBar();
-      }
-    })
-    .on('postgres_changes', { event:'DELETE', schema:'public', table:'messages', filter:`conversation_id=eq.${conversationId}` }, payload=>{
-      const id = payload.old && payload.old.id;
-      const row = id && $(`.msg-row[data-id="${id}"]`);
-      if(row) row.remove();
-      if(id){ messageCache.delete(id); selectedMessageIds.delete(id); updateMessageActions(); }
-    })
-    .on('broadcast', { event:'typing' }, payload=>{
-      if(payload.payload && payload.payload.userId !== me.id) showTyping();
-    })
-    .subscribe();
-}
-
-let typingRowEl = null, typingHideTimer = null;
-function showTyping(){
-  if(!activeConvo) return;
-  $('#chatStatus').classList.add('typing');
-  $('#chatStatus').innerHTML = '<span class="typing">typing…</span>';
-  if(!typingRowEl){
-    typingRowEl = document.createElement('div');
-    typingRowEl.className = 'typing-row';
-    typingRowEl.innerHTML = `<div class="typing-bubble"><span></span><span></span><span></span></div>`;
-    $('#messages').appendChild(typingRowEl);
-    scrollBottom();
-  }
-  clearTimeout(typingHideTimer);
-  typingHideTimer = setTimeout(hideTyping, 2500);
-}
-function hideTyping(){
-  $('#chatStatus').classList.remove('typing');
-  updateChatHeaderStatus();
-  if(typingRowEl){ typingRowEl.remove(); typingRowEl = null; }
-}
-
-/* ============ COMPOSER ============ */
-const msgInput = $('#msgInput');
-const sendBtn = $('#sendBtn');
-function adjustMobileViewport(){
-  if(!window.visualViewport) return;
-  const height = window.visualViewport.height;
-  if(window.innerWidth <= 860){
-    app.style.height = height + 'px';
-    $('#chatPanel').style.height = height + 'px';
-    if(document.activeElement === msgInput) requestAnimationFrame(()=>{ $('#messages').scrollTop = $('#messages').scrollHeight; });
-  } else {
-    app.style.height = '';
-    $('#chatPanel').style.height = '';
-  }
-}
-if(window.visualViewport) window.visualViewport.addEventListener('resize', adjustMobileViewport);
-window.addEventListener('resize', adjustMobileViewport);
-msgInput.addEventListener('focus', ()=>{ adjustMobileViewport(); requestAnimationFrame(()=>{ $('#messages').scrollTop = $('#messages').scrollHeight; }); });
-msgInput.addEventListener('input', ()=>{
-  sendBtn.disabled = msgInput.value.trim().length === 0;
-  autoGrow();
-  if(messagesChannel && activeConvo){
-    messagesChannel.send({ type:'broadcast', event:'typing', payload:{ userId: me.id } });
-  }
-});
-msgInput.addEventListener('keydown', e=>{
-  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){
+  /* ===================== GATE (seller passkey entry) ===================== */
+  var gateForm = document.getElementById('gateForm');
+  gateForm.addEventListener('submit', async function (e) {
     e.preventDefault();
-    sendMessage();
-  }
-});
-function autoGrow(){
-  msgInput.style.height = 'auto';
-  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + 'px';
-}
-sendBtn.addEventListener('click', sendMessage);
+    var phone = normalizePhone(document.getElementById('gatePhone').value);
+    var code = document.getElementById('gateCode').value.trim();
+    var errEl = document.getElementById('gateError');
+    errEl.textContent = '';
 
-async function sendMessage(){
-  const text = msgInput.value.trim();
-  if(!text || !activeConvo) return;
-  if(activeConvo._recontactRejected){
-    const {error}=await sb.rpc('request_recontact',{p_conversation_id:activeConvo.id});
-    if(error){ showToast(error.code==='PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (error.message || 'Could not send reconnect request.')); return; }
-    msgInput.value='';
-    autoGrow();
-    sendBtn.disabled=true;
-    showToast('Reconnect request sent. Waiting for approval.');
-    return;
-  }
-  msgInput.value = '';
-  sendBtn.disabled = true;
-  autoGrow();
-
-  const optimisticId = 'temp-' + Date.now();
-  const optimistic = { id: optimisticId, sender_id: me.id, body: text, status:'sent', created_at: new Date().toISOString() };
-  renderedMessageIds.add(optimisticId);
-  $('#messages').appendChild(renderMessageRow(optimistic));
-  scrollBottom();
-
-  const { data, error } = await sb.from('messages').insert({
-    conversation_id: activeConvo.id, sender_id: me.id, body: text
-  }).select().single();
-
-  if(error){
-    showToast('Message failed to send.');
-    const row = $(`.msg-row[data-id="${optimisticId}"]`);
-    if(row) row.style.opacity = '.4';
-    return;
-  }
-  // swap the optimistic row's id for the real one so realtime echo is deduped
-  const row = $(`.msg-row[data-id="${optimisticId}"]`);
-  if(row) row.dataset.id = data.id;
-  renderedMessageIds.delete(optimisticId);
-  renderedMessageIds.add(data.id);
-}
-
-/* ============ EMOJI POPOVER ============ */
-const emojis = ['😀','😂','😍','🙌','👍','🔥','🎉','❤️','😅','🤔','👏','😢','😎','🙏','💯','😴','🥳','😇','🚀','✨','😊','🤝','👋','☕'];
-$('#emojiPop').innerHTML = emojis.map(e=>`<button type="button">${e}</button>`).join('');
-$('#emojiPop').addEventListener('click', e=>{
-  const b = e.target.closest('button'); if(!b) return;
-  msgInput.value += b.textContent;
-  msgInput.dispatchEvent(new Event('input'));
-  msgInput.focus();
-});
-$('#emojiBtn').addEventListener('click', ()=> $('#emojiPop').classList.toggle('show'));
-document.addEventListener('click', e=>{
-  if(!e.target.closest('#emojiBtn') && !e.target.closest('#emojiPop')) $('#emojiPop').classList.remove('show');
-});
-
-/* ============ DISCOVER (find someone by phone) ============ */
-$('#newChatBtn').addEventListener('click', ()=>{
-  $('#discoverScrim').classList.add('show');
-  selectedGroupProfiles.clear(); $('#groupNameInput').value=''; $('#groupSearchInput').value=''; $('#groupSearchResult').innerHTML=''; renderGroupSelection();
-  $('#newChatChoice').style.display='flex'; $('#singleChatForm').style.display='none'; $('#groupForm').classList.remove('show');
-  $('#discoverInput').value = '';
-  $('#discoverResult').innerHTML = '';
-  $('#discoverInput').focus();
-});
-$('#chooseNewChat').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='block'; $('#groupForm').classList.remove('show'); $('#discoverInput').focus(); });
-$('#chooseNewGroup').addEventListener('click', ()=>{ $('#newChatChoice').style.display='none'; $('#singleChatForm').style.display='none'; $('#groupForm').classList.add('show'); $('#groupNameInput').focus(); });
-function renderGroupSelection(){
-  const h=$('#groupMembersHint');
-  if(!selectedGroupProfiles.size){
-    h.className='group-selected empty';
-    h.textContent='No members selected';
-    return;
-  }
-  h.className='group-selected';
-  h.innerHTML=[...selectedGroupProfiles.values()].map(p=>{
-    const name=p.display_name||p.phone||'Speakora user';
-    return `<div class="group-member-chip" data-selected-member="${p.id}">
-      <div class="avatar" style="background:${avatarColor(p.id)}">${initials(name)}</div>
-      <span class="group-member-chip-name" title="${escapeHtml(name)}">${escapeHtml(name)}</span>
-      <button type="button" class="group-member-remove" data-remove-member="${p.id}" aria-label="Remove ${escapeHtml(name)}"><i class="fa-solid fa-xmark"></i></button>
-    </div>`;
-  }).join('');
-  h.querySelectorAll('[data-remove-member]').forEach(btn=>btn.addEventListener('click', e=>{
-    e.stopPropagation();
-    selectedGroupProfiles.delete(btn.dataset.removeMember);
-    renderGroupSelection();
-    if($('#groupSearchInput').value.trim()) searchGroupMember();
-  }));
-}
-async function searchGroupMember(){ const term=$('#groupSearchInput').value.trim(); if(!term){ $('#groupSearchResult').innerHTML=''; return; } const clean=term.replace(/[%_,]/g,''); const phoneSearch=/^[+\d\s()-]+$/.test(term); let query=sb.from('profiles').select('*'); if(!phoneSearch){ const chattedIds=conversations.map(c=>otherParty(c)).filter(Boolean).map(p=>p.id).filter(Boolean); if(!chattedIds.length){ $('#groupSearchResult').innerHTML='<div class="discover-empty">No previous contacts yet.</div>'; return; } query=query.in('id',chattedIds).ilike('display_name',`%${clean}%`); } else { query=query.ilike('phone',`%${clean}%`); } const {data}=await query.limit(8); const box=$('#groupSearchResult'); if(!data||!data.length){box.innerHTML='<div class="discover-empty">No user found.</div>';return;} box.innerHTML=data.filter(p=>p.id!==me.id).map(p=>`<div class="result-card"><div class="avatar sm" style="background:${avatarColor(p.id)}">${initials(p.display_name||p.phone)}</div><div class="result-info"><div class="result-name">${escapeHtml(p.display_name||'Speakora user')}</div><div class="result-sub">${p.phone}</div></div><button type="button" data-member-id="${p.id}">${selectedGroupProfiles.has(p.id)?'Remove':'Add'}</button></div>`).join(''); box.querySelectorAll('[data-member-id]').forEach(btn=>btn.onclick=()=>{const p=data.find(x=>x.id===btn.dataset.memberId); if(selectedGroupProfiles.has(p.id)) selectedGroupProfiles.delete(p.id); else selectedGroupProfiles.set(p.id,p); renderGroupSelection(); searchGroupMember();}); }
-let groupSearchTimer=null;
-$('#groupSearchInput').addEventListener('input',()=>{ clearTimeout(groupSearchTimer); groupSearchTimer=setTimeout(searchGroupMember,220); });
-$('#createGroupBtn').addEventListener('click', async ()=>{
-  const name=$('#groupNameInput').value.trim(); const ids=[me.id,...selectedGroupProfiles.keys()];
-  if(!name || ids.length<2){ showToast('Enter a group name and select at least one member.'); return; }
-  if(ids.length<2){ showToast('Choose at least one other member.'); return; }
-  const createBtn=$('#createGroupBtn'); createBtn.disabled=true;
-  const {data,error}=await sb.rpc('create_group_conversation',{p_group_name:name,p_member_ids:[...new Set(ids)]});
-  createBtn.disabled=false;
-  if(error){ showToast(error.code==='23505' ? 'This group conflicts with an older group schema. Re-run migration_groups.sql.' : (error.message || 'Could not create group.')); return; }
-  selectedGroupProfiles.clear(); renderGroupSelection(); $('#discoverScrim').classList.remove('show'); await loadConversations(); const fresh=conversations.find(c=>c.id===(data&&data.id))||data; if(fresh) openConversation(fresh);
-});
-$('#chatNotifyBtn').addEventListener('click', ()=>{
-  const count = Number($('#notifyCount').textContent.replace('+','')) || 0;
-  showToast(count ? `${count} unread message${count === 1 ? '' : 's'}` : 'No unread messages');
-});
-$('#chatContactBtn').addEventListener('click',e=>{e.stopPropagation();$('#chatContactMenu').classList.toggle('show');});
-document.addEventListener('click',e=>{if(!e.target.closest('.chat-contact-wrap'))$('#chatContactMenu').classList.remove('show');});
-$('#searchMessagesBtn').addEventListener('click',()=>{
-  $('#chatContactMenu').classList.remove('show');
-  const bar=$('#messageSearchBar'); if(!bar) return;
-  bar.classList.add('show');
-  $('#messageSearchInput').focus();
-});
-$('#groupInfoBtn').addEventListener('click',async()=>{
-  if(!activeConvo) return;
-  const members = groupMembersCache.get(activeConvo.id) || [];
-  renderGroupInfo(activeConvo, members);
-  $('#chatContactMenu').classList.remove('show');
-});
-function renderAddMemberSelection(){
-  const box=$('#addMembersSelected');
-  if(!addMemberProfiles.size){ box.className='group-selected empty'; box.textContent='No members selected'; return; }
-  box.className='group-selected';
-  box.innerHTML=[...addMemberProfiles.values()].map(p=>{ const name=p.display_name||p.phone||'Speakora user'; return `<div class="group-member-chip"><div class="avatar" style="background:${avatarColor(p.id)}">${initials(name)}</div><span class="group-member-chip-name">${escapeHtml(name)}</span><button type="button" class="group-member-remove" data-remove-add-member="${p.id}" aria-label="Remove ${escapeHtml(name)}"><i class="fa-solid fa-xmark"></i></button></div>`; }).join('');
-  box.querySelectorAll('[data-remove-add-member]').forEach(btn=>btn.addEventListener('click',()=>{ addMemberProfiles.delete(btn.dataset.removeAddMember); renderAddMemberSelection(); searchAddMembers(); }));
-}
-async function searchAddMembers(){
-  if(!activeConvo || !activeConvo.is_group) return;
-  const term=$('#addMemberSearchInput').value.trim();
-  const box=$('#addMemberSearchResult');
-  if(!term){ box.innerHTML=''; return; }
-  const existing=new Set((groupMembersCache.get(activeConvo.id)||[]).map(m=>m.id));
-  const clean=term.replace(/[%_,]/g,''); const phoneSearch=/^[+\d\s()-]+$/.test(term);
-  let query=sb.from('profiles').select('*');
-  if(phoneSearch) query=query.ilike('phone',`%${clean}%`);
-  else { const ids=conversations.map(c=>otherParty(c)).filter(Boolean).map(p=>p.id).filter(Boolean); if(!ids.length){box.innerHTML='<div class="discover-empty">No previous contacts yet.</div>';return;} query=query.in('id',ids).ilike('display_name',`%${clean}%`); }
-  const {data}=await query.limit(12);
-  const matches=(data||[]).filter(p=>p.id!==me.id);
-  if(phoneSearch){
-    const enteredPhone=normalizePhone(term);
-    const duplicate=matches.find(p=>normalizePhone(p.phone||'')===enteredPhone && existing.has(p.id));
-    if(duplicate){
-      const name=duplicate.display_name||duplicate.phone||'This person';
-      box.innerHTML=`<div class="discover-empty">${escapeHtml(name)} is already a member of this group.</div>`;
+    if (!hasSupabaseConnection()) {
+      errEl.textContent = 'Muunganisho wa database haujapatikana. Angalia intaneti yako.';
       return;
     }
-  }
-  const rows=matches.filter(p=>!existing.has(p.id));
-  if(!rows.length){
-    const alreadyExists=matches.some(p=>existing.has(p.id));
-    box.innerHTML=`<div class="discover-empty">${alreadyExists?'This person is already a member of this group.':'No available contact found.'}</div>`;
-    return;
-  }
-  box.innerHTML=rows.map(p=>{const name=p.display_name||p.phone||'Speakora user'; return `<div class="result-card"><div class="avatar sm" style="background:${avatarColor(p.id)}">${initials(name)}</div><div class="result-info"><div class="result-name">${escapeHtml(name)}</div><div class="result-sub">${escapeHtml(p.phone||'')}</div></div><button type="button" data-add-member-id="${p.id}">${addMemberProfiles.has(p.id)?'Remove':'Add'}</button></div>`;}).join('');
-  box.querySelectorAll('[data-add-member-id]').forEach(btn=>btn.addEventListener('click',()=>{const p=rows.find(x=>x.id===btn.dataset.addMemberId); if(addMemberProfiles.has(p.id)) addMemberProfiles.delete(p.id); else addMemberProfiles.set(p.id,p); renderAddMemberSelection(); searchAddMembers();}));
-}
-let addMemberSearchTimer=null;
-$('#addMemberSearchInput').addEventListener('input',()=>{ clearTimeout(addMemberSearchTimer); addMemberSearchTimer=setTimeout(searchAddMembers,220); });
-$('#groupMemberSearch').addEventListener('input',()=>{ if(activeConvo && activeConvo.is_group) renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]); });
-$('#saveGroupInfo').addEventListener('click',async()=>{
-  if(!activeConvo || !activeConvo.is_group) return;
-  const name=$('#groupInfoNameInput').value.trim();
-  if(!name){ showToast('Enter a group name.'); return; }
-  const { data, error } = await sb.rpc('group_update_details',{p_conversation_id:activeConvo.id,p_group_name:name,p_group_description:$('#groupInfoDescription').textContent==='No group description.'?'':$('#groupInfoDescription').textContent,p_members_can_add:$('#groupMemberPermission').value==='all'});
-  if(error){ showToast(error.message || 'Could not update group.'); return; }
-  activeConvo = { ...activeConvo, ...(data || {}), group_name:name, members_can_add:$('#groupMemberPermission').value==='all' };
-  renderGroupInfo(activeConvo, groupMembersCache.get(activeConvo.id)||[]);
-  $('#chatName').textContent = name;
-  showToast('Group details updated.');
-});
-$('#groupAddMemberBtn').addEventListener('click',()=>{
-  if(!activeConvo || !activeConvo.is_group) return;
-  addMemberProfiles.clear(); renderAddMemberSelection(); $('#addMemberSearchInput').value=''; $('#addMemberSearchResult').innerHTML='';
-  $('#addMembersScrim').classList.add('show');
-  $('#chatContactMenu').classList.remove('show');
-});
-$('#confirmAddMembers').addEventListener('click',async()=>{
-  if(!activeConvo || !addMemberProfiles.size){ showToast('Select at least one member.'); return; }
-  const ids=[...addMemberProfiles.keys()];
-  const results=await Promise.all(ids.map(id=>sb.rpc('group_add_member',{p_conversation_id:activeConvo.id,p_user_id:id})));
-  const failed=results.find(r=>r.error);
-  if(failed){ showToast(failed.error.message || 'Could not add members.'); return; }
-  $('#addMembersScrim').classList.remove('show');
-  addMemberProfiles.clear();
-  const members=await loadGroupMembers(activeConvo.id);
-  renderGroupInfo(activeConvo,members); updateChatHeaderStatus();
-  showToast(`${ids.length} member${ids.length===1?'':'s'} added.`);
-});
-$('#closeAddMembers').addEventListener('click',()=>$('#addMembersScrim').classList.remove('show'));
-$('#addMembersScrim').addEventListener('click',e=>{if(e.target.id==='addMembersScrim')$('#addMembersScrim').classList.remove('show');});
-function currentContact(){ return activeConvo ? otherParty(activeConvo) : null; }
-$('#viewContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p)return; showContactProfile(p); $('#chatContactMenu').classList.remove('show');});
-$('#shareContactNumberBtn').addEventListener('click',async()=>{const p=currentContact(); if(!p||!p.phone)return; try{if(navigator.share) await navigator.share({title:p.display_name||'Contact',text:`${p.display_name||'Contact'}: ${p.phone}`}); else await navigator.clipboard.writeText(p.phone); showToast('Contact number shared.');}catch(e){} $('#chatContactMenu').classList.remove('show');});
-$('#saveContactBtn').addEventListener('click',()=>{const p=currentContact(); if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(a.href); showToast('Contact file created.'); $('#chatContactMenu').classList.remove('show');});
-$('#deleteCurrentChatBtn').addEventListener('click',async()=>{if(!activeConvo)return; $('#chatContactMenu').classList.remove('show'); await removeConversation(activeConvo);});
-async function respondToRecontact(decision){
-  const request=activeRecontactRequest;
-  if(!request){ showToast('This reconnect request is no longer available.'); return; }
-  $('#recontactScrim').classList.remove('show');
-  activeRecontactRequest=null;
-  const {data,error}=await sb.rpc('respond_recontact',{p_request_id:request.id,p_decision:decision});
-  if(error){
-    console.error('[Speakora recontact] Response failed', error);
-    showToast(error.code==='PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (error.message || 'Could not respond to chat request.'));
-    return;
-  }
-  await loadConversations();
-  if(decision==='allowed'){
-    const convo=conversations.find(c=>c.id===request.conversation_id);
-    if(convo){ convo._recontactAllowed=true; await openConversation(convo); }
-    showToast('Chat restored with the latest 10 messages.');
-  } else {
-    showToast('Chat request rejected.');
-  }
-}
-$('#allowRecontactBtn').addEventListener('click',()=>respondToRecontact('allowed'));
-$('#rejectRecontactBtn').addEventListener('click',()=>respondToRecontact('rejected'));
-$('#closeContactProfile').addEventListener('click',()=>$('#contactProfileScrim').classList.remove('show'));
-$('#contactProfileScrim').addEventListener('click',e=>{if(e.target.id==='contactProfileScrim')$('#contactProfileScrim').classList.remove('show');});
-$('#contactCopyName').addEventListener('click',()=>copyContactField(contactProfileTarget && (contactProfileTarget.display_name||contactProfileTarget.phone),'Name'));
-$('#contactCopyPhone').addEventListener('click',()=>copyContactField(contactProfileTarget && contactProfileTarget.phone,'Phone number'));
-$('#contactChatNow').addEventListener('click',async()=>{
-  if(!contactProfileTarget) return;
-  const btn = $('#contactChatNow');
-  btn.disabled = true;
-  btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Opening…';
-  $('#contactProfileScrim').classList.remove('show');
-  $('#groupInfoScrim').classList.remove('show');
-  await startConversationWith(contactProfileTarget);
-  btn.disabled = false;
-  btn.innerHTML = '<i class="fa-solid fa-message"></i> Chat now';
-});
-$('#contactAddBtn').addEventListener('click',()=>{const p=contactProfileTarget; if(!p||!p.phone)return; const vcard=`BEGIN:VCARD\nVERSION:3.0\nFN:${p.display_name||p.phone}\nTEL:${p.phone}\nEND:VCARD`; const url=URL.createObjectURL(new Blob([vcard],{type:'text/vcard'})); const a=document.createElement('a'); a.href=url; a.download=`${(p.display_name||'contact').replace(/[^a-z0-9]/gi,'_')}.vcf`; a.click(); URL.revokeObjectURL(url); showToast('Contact file created.');});
-$('#closeGroupInfo').addEventListener('click',()=>$('#groupInfoScrim').classList.remove('show'));
-$('#groupInfoScrim').addEventListener('click',e=>{if(e.target.id==='groupInfoScrim')$('#groupInfoScrim').classList.remove('show');});
-$(`#pinComposerBtn`).addEventListener('click',()=>showToast('Pin tools are ready for a future update.'));
-$('#closeDiscover').addEventListener('click', ()=> $('#discoverScrim').classList.remove('show'));
-$('#discoverScrim').addEventListener('click', e=>{ if(e.target.id==='discoverScrim') $('#discoverScrim').classList.remove('show'); });
 
-async function runDiscover(){
-  const raw = $('#discoverInput').value.trim();
-  if(!raw) return;
-  const phone = normalizePhone(raw);
-  const digitCount = phone.replace(/\D/g, '').length;
-  const resultBox = $('#discoverResult');
-  if(digitCount < 6) {
-    resultBox.innerHTML = '';
-    return;
-  }
-  resultBox.innerHTML = `<div class="discover-empty"><i class="fa-solid fa-spinner fa-spin"></i> Searching…</div>`;
+    var submitBtn = gateForm.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
 
-  if(phone === myProfile.phone){
-    resultBox.innerHTML = `<div class="discover-empty">That's your own number.</div>`;
-    return;
-  }
-  const { data, error } = await sb.from('profiles').select('*').eq('phone', phone).maybeSingle();
-  if(error || !data){
-    resultBox.innerHTML = `<div class="discover-empty">No Speakora user found with that number yet.</div>`;
-    return;
-  }
-  const country = countryFromPhone(data.phone);
-  resultBox.innerHTML = `
-    <div class="result-card">
-      <div class="avatar sm" style="background:${avatarColor(data.id)}">${initials(data.display_name||data.phone)}</div>
-      <div class="result-info">
-        <div class="result-name">${escapeHtml(data.display_name || 'Speakora user')}</div>
-        <div class="result-sub">${data.phone}${country ? ' · ' + country.name : ''}</div>
-      </div>
-      <button id="startChatBtn">Message</button>
-    </div>`;
-  $('#startChatBtn').addEventListener('click', async ()=>{
-    const btn = $('#startChatBtn');
-    btn.disabled = true;
-    btn.textContent = 'Opening…';
-    await startConversationWith(data);
+    try {
+      /* Sellers never get a real Supabase Auth account. Instead we sign
+         them into a lightweight ANONYMOUS auth session first, then the
+         seller_login RPC links that anon auth.uid() to their seller
+         row. Every later insert (application, photos) is scoped by RLS
+         to "the anon session tied to this seller_id" — so we are never
+         trusting a bare client-supplied seller_id for writes. Logging
+         in again (same or another device) simply re-points the link,
+         so only the most recent login can submit for that seller. */
+      var sessionResult = await supabaseClient.auth.getSession();
+      if (!sessionResult.data.session) {
+        var anonResult = await supabaseClient.auth.signInAnonymously();
+        if (anonResult.error) throw anonResult.error;
+      }
+
+      var rpcResult = await supabaseClient.rpc('seller_login', { p_phone: phone, p_passkey: code });
+      if (rpcResult.error) throw rpcResult.error;
+      var match = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
+      if (!match) throw new Error('SELLER_NOT_FOUND');
+
+      currentApplicant = match;
+
+      document.getElementById('formTopbarName').textContent = 'Fomu ya ' + match.full_name;
+      document.getElementById('sellerApplicationId').textContent = match.application_id;
+      document.getElementById('a_fullname').value = match.full_name;
+      document.getElementById('a_phone').value = phone;
+      await renderSellerResponse(match.application_id);
+
+      showView('formView');
+    } catch (err) {
+      console.error('seller login error', err);
+      var msg = (err && err.message) || '';
+      if (msg.indexOf('SELLER_NOT_FOUND') !== -1) {
+        errEl.textContent = 'Namba hii haijasajiliwa. Wasiliana na admin kwanza kupata usajili.';
+      } else if (msg.indexOf('INVALID_PASSKEY') !== -1) {
+        errEl.textContent = 'Tarakimu 6 si sahihi. Jaribu tena au wasiliana na admin.';
+      } else {
+        errEl.textContent = 'Imeshindikana kuingia. Angalia intaneti yako na jaribu tena.';
+      }
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
   });
-}
-$('#discoverBtn').addEventListener('click', runDiscover);
-$('#discoverInput').addEventListener('keydown', e=>{ if(e.key==='Enter') runDiscover(); });
-let discoverTimer = null;
-$('#discoverInput').addEventListener('input', ()=>{
-  clearTimeout(discoverTimer);
-  const digits = $('#discoverInput').value.replace(/\D/g, '');
-  if(digits.length < 6){
-    $('#discoverResult').innerHTML = '';
-    return;
-  }
-  discoverTimer = setTimeout(runDiscover, 350);
-});
 
-/* ============ MORE MENU / PROFILE ============ */
-const moreBtn = $('#moreBtn');
-const moreMenu = $('#moreMenu');
-moreBtn.addEventListener('click', e=>{
-  e.stopPropagation();
-  const open = moreMenu.classList.toggle('show');
-  moreBtn.setAttribute('aria-expanded', String(open));
-});
-document.addEventListener('click', e=>{
-  if(!e.target.closest('.more-wrap')){
-    moreMenu.classList.remove('show');
-    moreBtn.setAttribute('aria-expanded', 'false');
-  }
-});
-
-$('#shareContactBtn').addEventListener('click', async ()=>{
-  moreMenu.classList.remove('show');
-  moreBtn.setAttribute('aria-expanded', 'false');
-  // The key prevents accidental edits to the contact id in this prototype;
-  // it is an invite token, not a substitute for authentication.
-  const link = `${location.href.split('?')[0]}?contact=${encodeURIComponent(myProfile.id)}&key=${encodeURIComponent(btoa(myProfile.id))}`;
-  $('#shareLinkInput').value = link;
-  $('#nativeShareBtn').style.display = navigator.share ? 'block' : 'none';
-  $('#shareScrim').classList.add('show');
-});
-$('#closeShare').addEventListener('click', ()=> $('#shareScrim').classList.remove('show'));
-$('#shareScrim').addEventListener('click', e=>{ if(e.target.id === 'shareScrim') $('#shareScrim').classList.remove('show'); });
-$('#nativeShareBtn').addEventListener('click', async ()=>{
-  const link = $('#shareLinkInput').value;
-  if(!navigator.share) return;
-  try{
-    await navigator.share({ title:'Join me on Speakora', text:'Message me on Speakora:', url:link });
-    $('#shareScrim').classList.remove('show');
-  }catch(e){
-    if(e.name !== 'AbortError') showToast('Could not open the sharing menu.');
-  }
-});
-$('#copyShareBtn').addEventListener('click', async ()=>{
-  const link = $('#shareLinkInput').value;
-  try{
-    await navigator.clipboard.writeText(link);
-    showToast('Contact link copied to clipboard.');
-    $('#shareScrim').classList.remove('show');
-  }catch(e){
-    $('#shareLinkInput').focus();
-    $('#shareLinkInput').select();
-    showToast('Select and copy the contact link.');
-  }
-});
-
-function openProfileModal(){
-  $('#profileName').value = myProfile.display_name || '';
-  $('#profilePhone').value = myProfile.phone || '';
-  const profileCountry = countryFromPhone(myProfile.phone || '');
-  $('#profileCountry').textContent = profileCountry ? profileCountry.name : 'Unknown country';
-  $('#profileEmail').value = myProfile.email || me.email || '';
-  $('#profileAvatarLarge').style.background = avatarColor(myProfile.id);
-  $('#profileAvatarLarge').textContent = initials(myProfile.display_name || myProfile.email);
-  $('#profileMsg').className = 'auth-msg';
-  $('#profileScrim').classList.add('show');
-}
-$('#profileBtn').addEventListener('click', ()=>{ moreMenu.classList.remove('show'); moreBtn.setAttribute('aria-expanded','false'); openProfileModal(); });
-$('#rejectedContactsBtn').addEventListener('click', openRejectedContacts);
-$('#closeProfile').addEventListener('click', ()=> $('#profileScrim').classList.remove('show'));
-$('#profileScrim').addEventListener('click', e=>{ if(e.target.id === 'profileScrim') $('#profileScrim').classList.remove('show'); });
-$('#closeRejectedContacts').addEventListener('click', ()=> $('#rejectedContactsScrim').classList.remove('show'));
-$('#rejectedContactsScrim').addEventListener('click', e=>{ if(e.target.id === 'rejectedContactsScrim') $('#rejectedContactsScrim').classList.remove('show'); });
-$('#profileName').addEventListener('input', e=>{ $('#profileAvatarLarge').textContent = initials(e.target.value) || '?'; });
-$('#profilePhone').addEventListener('input', e=>{
-  const country = countryFromPhone(normalizePhone(e.target.value));
-  $('#profileCountry').textContent = country ? country.name : (e.target.value.trim() ? 'Unknown country' : '—');
-});
-$('#profileForm').addEventListener('submit', async e=>{
-  e.preventDefault();
-  const name = $('#profileName').value.trim();
-  const phone = normalizePhone($('#profilePhone').value);
-  const msg = $('#profileMsg');
-  if(!name || !/^\+[0-9]{5,15}$/.test(phone)){
-    msg.textContent = 'Enter a name and a valid phone number with country code.';
-    msg.className = 'auth-msg show error';
-    return;
-  }
-  const btn = $('#profileSaveBtn');
-  btn.disabled = true;
-  const country = countryFromPhone(phone);
-  const { data, error } = await sb.from('profiles').update({
-    display_name:name, phone, dial_code:country ? country.dial : null,
-    country_code:country ? country.iso : null, country_name:country ? country.name : null
-  }).eq('id', me.id).select().single();
-  btn.disabled = false;
-  if(error){
-    msg.textContent = error.code === '23505' ? 'That phone number is already registered.' : error.message;
-    msg.className = 'auth-msg show error';
-    return;
-  }
-  myProfile = data;
-  $('#profileCountry').textContent = country ? country.name : 'Unknown country';
-  $('#meAvatar').textContent = initials(myProfile.display_name || myProfile.email);
-  $('#meName').textContent = myProfile.display_name || myProfile.email;
-  const updatedCountry = countryFromPhone(myProfile.phone);
-  $('#meSub').textContent = updatedCountry ? `${myProfile.phone} · ${updatedCountry.name}` : myProfile.phone;
-  $('#profileScrim').classList.remove('show');
-  showToast('Profile updated.');
-});
-
-async function startConversationWith(otherProfile){
-  if(!otherProfile || !otherProfile.id) return;
-  if(otherProfile.id === me.id){ showToast('That is your own profile.'); return; }
-  const a = me.id < otherProfile.id ? me.id : otherProfile.id;
-  const b = me.id < otherProfile.id ? otherProfile.id : me.id;
-
-  let convoRow = null;
-  let startError = null;
-  const existing = await sb.from('conversations')
-    .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
-    .eq('user_a', a).eq('user_b', b).eq('is_group', false).maybeSingle();
-
-  if(existing.data){
-    convoRow = existing.data;
-  } else {
-    const inserted = await sb.from('conversations').insert({ user_a:a, user_b:b }).select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)').single();
-    if(inserted.error){
-      startError = inserted.error;
-      // race: someone else created it a moment earlier — just re-fetch
-      const retry = await sb.from('conversations')
-        .select('*, a:profiles!conversations_user_a_fkey(*), b:profiles!conversations_user_b_fkey(*)')
-        .eq('user_a', a).eq('user_b', b).eq('is_group', false).maybeSingle();
-      convoRow = retry.data;
-    } else {
-      convoRow = inserted.data;
+  function confirmLeaveForm(){
+    if (window.confirm('Una uhakika unataka kutoka? Taarifa ulizojaza hazitahifadhiwa.')) {
+      showView('gateView');
     }
   }
 
-  if(!convoRow){ showToast((startError && startError.message) || 'Could not start conversation.'); return; }
-
-  const { data: hiddenForMe } = await sb.from('conversation_hidden').select('conversation_id').eq('conversation_id', convoRow.id).eq('user_id', me.id).maybeSingle();
-  if(hiddenForMe){
-    const { error: requestError } = await sb.rpc('request_recontact', { p_conversation_id: convoRow.id });
-    if(requestError){ showToast(requestError.code === 'PGRST202' ? 'Run migration_recontact.sql in Supabase SQL Editor first.' : (requestError.message || 'Could not send chat request.')); return; }
-    $('#discoverScrim').classList.remove('show');
-    showToast('Chat request sent. Waiting for approval.');
-    return;
+  async function renderSellerResponse(applicationId){
+    var card = document.getElementById('sellerResponseCard');
+    card.classList.remove('is-active', 'is-rejected');
+    var full = await fetchFullApplication(applicationId);
+    var app = full && full.applications;
+    var response = app && app.application_responses;
+    if (!response) return;
+    var title = document.getElementById('sellerResponseTitle');
+    var message = document.getElementById('sellerResponseMessage');
+    if (response.status === 'approved') {
+      title.textContent = 'Maombi yako yamekubaliwa';
+      message.textContent = (response.reason ? response.reason + '. ' : '') +
+        (response.agreed_price != null ? 'Bei iliyokubaliwa ni ' + fmtMoney(response.agreed_price) + '.' : '');
+    } else {
+      title.textContent = 'Majibu ya maombi yako';
+      message.textContent = response.reason || 'Maombi yako hayajakubaliwa kwa sasa.';
+      card.classList.add('is-rejected');
+    }
+    card.classList.add('is-active');
   }
 
-  $('#discoverScrim').classList.remove('show');
-  $('#contactProfileScrim').classList.remove('show');
-  await sb.from('conversation_hidden').delete().eq('conversation_id', convoRow.id).eq('user_id', me.id);
-  await loadConversations();
-  const fresh = conversations.find(c=>c.id === convoRow.id) || convoRow;
-  await openConversation(fresh);
-  msgInput.focus();
-}
+  /* ===================== PHOTO UPLOAD (normalize to JPEG via canvas) ===================== */
+  var frontPhotoData = null;
+  var backPhotoData = null;
+  var supportingPhotoData = null;
 
-/* ============ BACK / THEME / LOGOUT ============ */
-$('#backBtn').addEventListener('click', ()=>{
-  if(!app.classList.contains('show-chat')) return;
-  closeChatView();
-  activeConvo = null;
-  // Chat entries use a temporary history state so the browser Back button
-  // also works. Clear it when the in-app arrow is used directly.
-  if(history.state && history.state.speakoraChat){
-    history.replaceState({}, '', location.href);
+  function fileToJpegDataUrl(file, maxDim, callback){
+    var reader = new FileReader();
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onload = function () {
+        var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+        var canvas = document.createElement('canvas');
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        callback(canvas.toDataURL('image/jpeg', 0.85));
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
   }
-});
-$('#themeBtn').addEventListener('click', ()=>{
-  const cur = document.documentElement.getAttribute('data-theme');
-  applyTheme(cur==='dark' ? 'light' : 'dark');
-});
-$('#logoutBtn').addEventListener('click', async ()=>{
-  clearInterval(recontactPollTimer);
-  if(presenceChannel) await presenceChannel.untrack();
-  if(messagesChannel) sb.removeChannel(messagesChannel);
-  if(conversationsChannel) sb.removeChannel(conversationsChannel);
-  if(inboxMessagesChannel) sb.removeChannel(inboxMessagesChannel);
-  if(presenceChannel) sb.removeChannel(presenceChannel);
-  await sb.auth.signOut();
-  location.reload();
-});
 
-/* ============ BOOT ============ */
-(async function boot(){
-  const { data } = await sb.auth.getSession();
-  if(data.session){
-    await handleAuthenticated(data.session);
-  } else {
-    authScreen.classList.remove('hidden');
+  function setupPhotoSlot(inputId, slotId, previewId, onReady){
+    var input = document.getElementById(inputId);
+    var slot = document.getElementById(slotId);
+    var preview = document.getElementById(previewId);
+    input.addEventListener('change', function () {
+      var file = input.files[0];
+      if (!file) return;
+      fileToJpegDataUrl(file, 1280, function (dataUrl) {
+        preview.src = dataUrl;
+        slot.classList.add('has-photo');
+        onReady(dataUrl);
+      });
+    });
   }
-})();
 
-})();
+  var activePhotoSide = null;
+  var photoPickerScrollY = 0;
+
+  function openPhotoPicker(side){
+    activePhotoSide = side;
+    photoPickerScrollY = window.scrollY;
+    document.getElementById('photoSourceTitle').textContent = side === 'front' ? 'Picha ya mbele ya simu' : (side === 'back' ? 'Picha ya nyuma ya simu' : 'Picha ya warranty / receipt');
+    document.getElementById('photoSourceModal').classList.add('is-active');
+  }
+
+  function closePhotoPicker(){ document.getElementById('photoSourceModal').classList.remove('is-active'); }
+
+  function selectPhotoSource(source){
+    if (!activePhotoSide) return;
+    var photoName = activePhotoSide === 'front' ? 'Front' : (activePhotoSide === 'back' ? 'Back' : 'Supporting');
+    var input = document.getElementById('photo' + photoName + (source === 'camera' ? 'Camera' : 'Gallery'));
+    closePhotoPicker();
+    input.value = '';
+    input.click();
+  }
+
+  function keepPhotoFormPosition(){
+    window.setTimeout(function(){ window.scrollTo(0, photoPickerScrollY); }, 50);
+  }
+
+  setupPhotoSlot('photoFrontGallery', 'photoFrontSlot', 'photoFrontPreview', function (dataUrl) { frontPhotoData = dataUrl; keepPhotoFormPosition(); });
+  setupPhotoSlot('photoFrontCamera', 'photoFrontSlot', 'photoFrontPreview', function (dataUrl) { frontPhotoData = dataUrl; keepPhotoFormPosition(); });
+  setupPhotoSlot('photoBackGallery', 'photoBackSlot', 'photoBackPreview', function (dataUrl) { backPhotoData = dataUrl; keepPhotoFormPosition(); });
+  setupPhotoSlot('photoBackCamera', 'photoBackSlot', 'photoBackPreview', function (dataUrl) { backPhotoData = dataUrl; keepPhotoFormPosition(); });
+  setupPhotoSlot('photoSupportingGallery', 'photoSupportingSlot', 'photoSupportingPreview', function (dataUrl) { supportingPhotoData = dataUrl; keepPhotoFormPosition(); });
+  setupPhotoSlot('photoSupportingCamera', 'photoSupportingSlot', 'photoSupportingPreview', function (dataUrl) { supportingPhotoData = dataUrl; keepPhotoFormPosition(); });
+
+  /* ===================== FORM COLLECTION ===================== */
+  function getVal(id){ var el = document.getElementById(id); return el ? el.value : ''; }
+  function getChecked(id){ var el = document.getElementById(id); return el ? el.checked : false; }
+  function getRadio(name){
+    var el = document.querySelector('input[name="' + name + '"]:checked');
+    return el ? el.value : '';
+  }
+
+  /* Flat payload matching the `applications` table column names 1:1,
+     so the exact same shape can be fed straight into the shared PDF
+     generator whether it comes from this form or from a DB read. */
+  function collectFormPayload(){
+    return {
+      seller_id: currentApplicant ? currentApplicant.seller_id : null,
+      a_full_name: getVal('a_fullname'), a_phone: getVal('a_phone'), a_nida: getVal('a_nida'),
+      a_location: getVal('a_location'), a_sale_date: getVal('a_saledate') || null, a_reason: getVal('a_reason') || null,
+      b_brand: getVal('b_brand'), b_model: getVal('b_model'), b_model_number: getVal('b_modelnum') || null,
+      b_imei1: getVal('b_imei1') || null, b_imei2: getVal('b_imei2') || null, b_serial: getVal('b_serial') || null,
+      b_storage: getVal('b_storage'), b_network: getRadio('b_network'), b_dual_sim: getRadio('b_dualsim') || null,
+      c_screen: getRadio('c_screen') || null, c_touch: getRadio('c_touch') || null, c_frame: getRadio('c_frame') || null,
+      c_backcover: getRadio('c_backcover') || null, c_camera_glass: getRadio('c_camglass') || null, c_camera_lens: getRadio('c_camlens') || null,
+      c_buttons: getRadio('c_buttons') || null, c_charging_port: getRadio('c_chargeport') || null, c_sim_tray: getRadio('c_simtray') || null,
+      c_speaker: getRadio('c_speaker') || null, c_microphone: getRadio('c_mic') || null,
+      d_battery_health: Number(getVal('d_health')) || 0, d_replaced: getRadio('d_replaced') || null,
+      d_charges_ok: getRadio('d_chargesok') || null, d_overheats: getRadio('d_overheats') || null, d_drains_fast: getRadio('d_drainsfast') || null,
+      f_front: getRadio('f_front') || null, f_main: getRadio('f_main') || null, f_ultrawide: getRadio('f_ultrawide') || null,
+      f_telephoto: getRadio('f_telephoto') || null, f_flash: getRadio('f_flash') || null, f_video: getRadio('f_video') || null, f_focus: getRadio('f_focus') || null,
+      g_powers_on: getRadio('g_powers') || null, g_fingerprint: getRadio('g_fingerprint') || null, g_face_id: getRadio('g_faceid') || null,
+      g_wifi: getRadio('g_wifi') || null, g_bluetooth: getRadio('g_bt') || null, g_gps: getRadio('g_gps') || null,
+      g_mobile_network: getRadio('g_network') || null, g_calls: getRadio('g_calls') || null, g_sms: getRadio('g_sms') || null, g_internet: getRadio('g_internet') || null,
+      h_opened: getRadio('h_opened') || null, h_repaired: getRadio('h_repaired') || null, h_screen_changed: getRadio('h_screenchanged') || null,
+      h_battery_changed: getRadio('h_batterychanged') || null, h_dropped_hard: getRadio('h_dropped') || null, h_water_damage: getRadio('h_water') || null,
+      h_spare_parts: getVal('h_spareparts') || null,
+      i_has_receipt: getChecked('i_receipt'), i_has_warranty: getChecked('i_warranty'), i_has_invoice: getChecked('i_invoice'), i_other: getVal('i_other') || null,
+      k_asking_price: Number(getVal('k_askingprice')) || 0,
+      conf_signature: getVal('conf_signature'), conf_date: getVal('conf_date') || null
+    };
+  }
+
+  /* ===================== FORM SUBMIT -> CONFIRM MODAL ===================== */
+  var sellForm = document.getElementById('sellForm');
+  sellForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var errEl = document.getElementById('formError');
+    if (!frontPhotoData || !backPhotoData) {
+      errEl.textContent = 'Tafadhali ambatanisha picha zote mbili za simu (mbele na nyuma) kabla ya kutuma.';
+      document.getElementById('photoFrontSlot').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    errEl.textContent = '';
+    document.getElementById('confirmModal').classList.add('is-active');
+  });
+
+  function closeConfirmModal(){
+    document.getElementById('confirmModal').classList.remove('is-active');
+  }
+
+  /* =====================================================================
+     PDF GENERATION — one shared generator for seller/inspector/admin
+     copies, using jspdf-autotable for aligned field tables and
+     automatic pagination. Requires the jspdf-autotable CDN script to
+     be loaded alongside jsPDF (see note above the file listing).
+     ===================================================================== */
+
+  var PDF_GOLD = [179, 130, 47];
+  var PDF_TEAL = [18, 138, 114];
+  var PDF_TEXT = [28, 33, 48];
+  var PDF_PANEL = [242, 239, 232];
+  var PDF_LINE = [227, 221, 208];
+
+  function pdfImageFormat(dataUrl){
+    return /^data:image\/png/i.test(dataUrl || '') ? 'PNG' : 'JPEG';
+  }
+
+  function getImageNaturalSize(dataUrl){
+    return new Promise(function (resolve) {
+      if (!dataUrl) { resolve(null); return; }
+      var img = new Image();
+      img.onload = function () { resolve({ w: img.naturalWidth || 1, h: img.naturalHeight || 1 }); };
+      img.onerror = function () { resolve(null); };
+      img.src = dataUrl;
+    });
+  }
+
+  /**
+   * Build one branded, paginated PDF for an application.
+   * @param {Object} row - flat application record (same column names as
+   *        the `applications` table — see collectFormPayload()).
+   * @param {string} humanId - the seller-facing application_id (e.g. SP-2026-483920).
+   * @param {Object} photos - { front, back, supporting } as data URLs (not remote URLs).
+   * @param {Object|null} response - application_responses row, or null if undecided.
+   * @param {Object} options - { audience: 'seller' | 'inspector' | 'admin' }
+   */
+  async function buildApplicationPdf(row, humanId, photos, response, options){
+    options = options || {};
+    var audience = options.audience || 'admin';
+    photos = photos || {};
+
+    var doc = new jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+    var pageW = doc.internal.pageSize.getWidth();
+    var pageH = doc.internal.pageSize.getHeight();
+    var margin = { left: 12, right: 12, top: 24, bottom: 16 };
+    var generatedAt = new Date().toLocaleString('sw-TZ');
+    var y = margin.top;
+
+    function drawHeader(){
+      doc.setFillColor(PDF_GOLD[0], PDF_GOLD[1], PDF_GOLD[2]);
+      doc.rect(0, 0, pageW, 16, 'F');
+      doc.setTextColor(255, 255, 255);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(13);
+      doc.text('SimuPesa', margin.left, 10.5);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(9);
+      doc.text('ID ya Maombi: ' + (humanId || '-'), pageW - margin.right, 10.5, { align: 'right' });
+    }
+
+    function drawFooter(){
+      doc.setDrawColor(PDF_LINE[0], PDF_LINE[1], PDF_LINE[2]);
+      doc.line(margin.left, pageH - 14, pageW - margin.right, pageH - 14);
+      doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.text('Imetengenezwa: ' + generatedAt, margin.left, pageH - 9);
+    }
+
+    function newPage(){
+      doc.addPage();
+      drawHeader();
+      drawFooter();
+      y = margin.top;
+    }
+
+    function ensureSpace(next){
+      if (y + next > pageH - margin.bottom) newPage();
+    }
+
+    function sectionBand(title){
+      ensureSpace(10);
+      doc.setFillColor(PDF_PANEL[0], PDF_PANEL[1], PDF_PANEL[2]);
+      doc.rect(margin.left, y, pageW - margin.left - margin.right, 7, 'F');
+      doc.setTextColor(PDF_TEAL[0], PDF_TEAL[1], PDF_TEAL[2]);
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(10.5);
+      doc.text(title, margin.left + 2, y + 5);
+      y += 10;
+      doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
+    }
+
+    function fieldTable(rows){
+      var body = rows
+        .filter(function (r) { return r[2] !== false; })
+        .map(function (r) { return [r[0], (r[1] === null || r[1] === undefined || r[1] === '') ? '-' : String(r[1])]; });
+      doc.autoTable({
+        startY: y,
+        margin: { left: margin.left, right: margin.right, top: margin.top, bottom: margin.bottom },
+        body: body,
+        theme: 'plain',
+        styles: { font: 'helvetica', fontSize: 9.5, textColor: PDF_TEXT, cellPadding: { top: 1.3, bottom: 1.3, left: 2, right: 2 } },
+        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 55 }, 1: { cellWidth: pageW - margin.left - margin.right - 55 } },
+        didDrawPage: function () { drawHeader(); drawFooter(); }
+      });
+      y = doc.lastAutoTable.finalY + 5;
+    }
+
+    function drawSinglePhoto(title, src, x, boxY, w, h, dim){
+      doc.setFont(undefined, 'bold');
+      doc.setFontSize(9);
+      doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
+      doc.text(title, x, boxY - 2);
+      if (!src) {
+        doc.setDrawColor(PDF_LINE[0], PDF_LINE[1], PDF_LINE[2]);
+        doc.setFillColor(PDF_PANEL[0], PDF_PANEL[1], PDF_PANEL[2]);
+        doc.rect(x, boxY, w, h, 'FD');
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(9);
+        doc.text('Hakuna picha iliyowekwa', x + w / 2, boxY + h / 2, { align: 'center' });
+        return;
+      }
+      try {
+        var format = pdfImageFormat(src);
+        var drawW = w, drawH = h;
+        if (dim && dim.w && dim.h) {
+          var ratio = dim.h / dim.w;
+          drawH = Math.min(h, w * ratio);
+          drawW = drawH / ratio;
+        }
+        var offsetX = x + (w - drawW) / 2;
+        var offsetY = boxY + (h - drawH) / 2;
+        doc.addImage(src, format, offsetX, offsetY, drawW, drawH);
+      } catch (err) {
+        console.error('photo embed failed', err);
+        doc.setDrawColor(PDF_LINE[0], PDF_LINE[1], PDF_LINE[2]);
+        doc.rect(x, boxY, w, h);
+        doc.setFontSize(9);
+        doc.text('Picha haikuweza kupakiwa', x + w / 2, boxY + h / 2, { align: 'center' });
+      }
+    }
+
+    async function addPhotoPair(leftTitle, leftSrc, rightTitle, rightSrc){
+      sectionBand('Picha za Simu');
+      var colW = (pageW - margin.left - margin.right - 6) / 2;
+      var maxH = 90;
+      var leftDim = await getImageNaturalSize(leftSrc);
+      var rightDim = await getImageNaturalSize(rightSrc);
+      var leftH = leftDim ? Math.min(maxH, colW * (leftDim.h / leftDim.w)) : maxH;
+      var rightH = rightDim ? Math.min(maxH, colW * (rightDim.h / rightDim.w)) : maxH;
+      var blockH = Math.max(leftH, rightH) + 8;
+      ensureSpace(blockH);
+      drawSinglePhoto(leftTitle, leftSrc, margin.left, y + 2, colW, leftH, leftDim);
+      drawSinglePhoto(rightTitle, rightSrc, margin.left + colW + 6, y + 2, colW, rightH, rightDim);
+      y += blockH + 6;
+    }
+
+    async function addPhotoSingle(title, src){
+      var w = pageW - margin.left - margin.right;
+      var maxH = 120;
+      var dim = await getImageNaturalSize(src);
+      var h = dim ? Math.min(maxH, w * (dim.h / dim.w)) : maxH;
+      ensureSpace(h + 10);
+      drawSinglePhoto(title, src, margin.left, y + 2, w, h, dim);
+      y += h + 8;
+    }
+
+    /* Page 1 header/footer (subsequent pages handled by newPage() /
+       autoTable's didDrawPage). */
+    drawHeader();
+    drawFooter();
+
+    /* Field-visibility variants: the inspector copy skips personal ID
+       fields and commercial price/decision info (technical condition
+       only); seller and admin copies include everything relevant to
+       them. Adjust this map if your review process differs. */
+    var sections = options.sections || (
+      audience === 'inspector'
+        ? ['cover', 'b', 'c', 'd', 'f', 'g', 'h', 'photos']
+        : ['cover', 'a', 'b', 'c', 'd', 'f', 'g', 'h', 'i', 'k', 'conf', 'decision', 'photos']
+    );
+    function has(key){ return sections.indexOf(key) !== -1; }
+
+    if (has('cover')) {
+      sectionBand('Taarifa Muhimu');
+      var coverRows = [
+        ['Jina la Muuzaji', row.a_full_name],
+        ['Namba ya Simu', row.a_phone],
+        ['ID ya Maombi', humanId]
+      ];
+      if (row.submitted_at) coverRows.push(['Tarehe ya Kutuma', fmtDate(row.submitted_at)]);
+      if (response) {
+        coverRows.push(['Hali ya Maombi', response.status === 'approved' ? 'Imekubaliwa' : 'Imekataliwa']);
+        if (response.status === 'approved') coverRows.push(['Bei Iliyokubaliwa', fmtMoney(response.agreed_price)]);
+      }
+      fieldTable(coverRows);
+    }
+
+    if (has('a')) {
+      sectionBand('A. Taarifa za Muuzaji');
+      fieldTable([
+        ['Jina kamili', row.a_full_name], ['Namba ya simu', row.a_phone], ['NIDA', row.a_nida],
+        ['Eneo anapoishi', row.a_location], ['Tarehe ya kuuza', row.a_sale_date], ['Sababu', row.a_reason]
+      ]);
+    }
+
+    if (has('b')) {
+      sectionBand('B. Utambulisho wa Simu');
+      fieldTable([
+        ['Brand', row.b_brand], ['Model', row.b_model], ['Model Number', row.b_model_number],
+        ['IMEI 1', row.b_imei1], ['IMEI 2', row.b_imei2], ['Serial Number', row.b_serial],
+        ['Storage', row.b_storage], ['Network', row.b_network], ['Dual SIM', row.b_dual_sim]
+      ]);
+    }
+
+    if (has('c')) {
+      sectionBand('C. Hali ya Nje ya Simu');
+      fieldTable([
+        ['Screen', row.c_screen], ['Touch', row.c_touch], ['Frame/Body', row.c_frame],
+        ['Back Cover', row.c_backcover], ['Camera Glass', row.c_camera_glass], ['Camera Lens', row.c_camera_lens],
+        ['Buttons', row.c_buttons], ['Charging Port', row.c_charging_port], ['SIM Tray', row.c_sim_tray],
+        ['Speaker', row.c_speaker], ['Microphone', row.c_microphone]
+      ]);
+    }
+
+    if (has('d')) {
+      sectionBand('D. Battery');
+      fieldTable([
+        ['Battery Health', row.d_battery_health != null ? row.d_battery_health + '%' : '-'],
+        ['Imebadilishwa', row.d_replaced], ['Inachaji vizuri', row.d_charges_ok],
+        ['Inapata joto', row.d_overheats], ['Inashuka haraka', row.d_drains_fast]
+      ]);
+    }
+
+    if (has('f')) {
+      sectionBand('F. Camera');
+      fieldTable([
+        ['Front Camera', row.f_front], ['Main Camera', row.f_main], ['Ultrawide', row.f_ultrawide],
+        ['Telephoto', row.f_telephoto], ['Flash', row.f_flash], ['Video Recording', row.f_video], ['Camera Focus', row.f_focus]
+      ]);
+    }
+
+    if (has('g')) {
+      sectionBand('G. Mfumo & Security');
+      fieldTable([
+        ['Inawaka vizuri', row.g_powers_on], ['Fingerprint', row.g_fingerprint], ['Face ID', row.g_face_id],
+        ['Wi-Fi', row.g_wifi], ['Bluetooth', row.g_bluetooth], ['GPS', row.g_gps], ['Mobile Network', row.g_mobile_network],
+        ['Calls', row.g_calls], ['SMS', row.g_sms], ['Internet/Data', row.g_internet]
+      ]);
+    }
+
+    if (has('h')) {
+      sectionBand('H. Historia ya Simu');
+      fieldTable([
+        ['Imewahi kufunguliwa', row.h_opened], ['Imewahi kutengenezwa', row.h_repaired],
+        ['Screen kubadilishwa', row.h_screen_changed], ['Battery kubadilishwa', row.h_battery_changed],
+        ['Imewahi kuanguka sana', row.h_dropped_hard], ['Imewahi kuingia maji', row.h_water_damage], ['Spare parts', row.h_spare_parts]
+      ]);
+    }
+
+    if (has('i')) {
+      sectionBand('I. Vifaa Vinavyoambatana');
+      fieldTable([
+        ['Receipt', row.i_has_receipt ? 'Ndiyo' : 'Hapana'], ['Warranty Card', row.i_has_warranty ? 'Ndiyo' : 'Hapana'],
+        ['Purchase Invoice', row.i_has_invoice ? 'Ndiyo' : 'Hapana'], ['Other', row.i_other]
+      ]);
+    }
+
+    if (has('k')) {
+      sectionBand('K. Bei');
+      fieldTable([
+        ['Bei anayotaka muuzaji', fmtMoney(row.k_asking_price)],
+        ['Bei ya mwisho', 'Hukubaliwa kati ya muuzaji na mnunuzi']
+      ]);
+    }
+
+    if (has('conf')) {
+      sectionBand('Uthibitisho wa Muuzaji');
+      fieldTable([
+        ['Sahihi (jina)', row.conf_signature], ['Tarehe', row.conf_date]
+      ]);
+    }
+
+    if (has('decision') && response) {
+      sectionBand('Majibu ya Admin');
+      fieldTable([
+        ['Hali', response.status === 'approved' ? 'Imekubaliwa' : 'Imekataliwa'],
+        ['Sababu', response.reason],
+        ['Bei Iliyokubaliwa', response.status === 'approved' ? fmtMoney(response.agreed_price) : '-']
+      ]);
+    }
+
+    if (has('photos')) {
+      await addPhotoPair('Mbele ya simu', photos.front, 'Nyuma ya simu', photos.back);
+      await addPhotoSingle('Warranty / Receipt / Invoice', photos.supporting);
+    }
+
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setTextColor(PDF_TEXT[0], PDF_TEXT[1], PDF_TEXT[2]);
+      doc.setFont(undefined, 'normal');
+      doc.setFontSize(8);
+      doc.text('Ukurasa ' + p + ' wa ' + totalPages, pageW - margin.right, pageH - 9, { align: 'right' });
+    }
+
+    return doc;
+  }
+
+  /* ===================== FINALIZE (Dhibitisha) — insert + upload ===================== */
+  var sellerPdfUrl = null;
+
+  async function dataUrlToBlob(dataUrl){
+    var res = await fetch(dataUrl);
+    return await res.blob();
+  }
+
+  async function finalizeSubmission(){
+    var confirmBtn = document.getElementById('confirmSubmitBtn');
+    var confirmErr = document.getElementById('confirmError');
+    confirmErr.textContent = '';
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Inatuma...';
+
+    try {
+      if (!currentApplicant) throw new Error('NO_SESSION');
+      if (!hasSupabaseConnection()) throw new Error('NO_CONNECTION');
+
+      var payload = collectFormPayload();
+
+      var insertResult = await supabaseClient.from('applications').insert(payload).select('id').single();
+      if (insertResult.error) throw insertResult.error;
+      var applicationPk = insertResult.data.id;
+      var sellerId = currentApplicant.seller_id;
+
+      var paths = {
+        front: sellerId + '/front.jpg',
+        back: sellerId + '/back.jpg',
+        supporting: supportingPhotoData ? sellerId + '/supporting.jpg' : null
+      };
+
+      async function uploadPhoto(path, dataUrl){
+        var blob = await dataUrlToBlob(dataUrl);
+        var uploadResult = await supabaseClient.storage.from(PHOTO_BUCKET).upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+        if (uploadResult.error) throw uploadResult.error;
+      }
+
+      await uploadPhoto(paths.front, frontPhotoData);
+      await uploadPhoto(paths.back, backPhotoData);
+      if (paths.supporting) await uploadPhoto(paths.supporting, supportingPhotoData);
+
+      var photoInsert = await supabaseClient.from('application_photos').insert({
+        application_id: applicationPk,
+        front_path: paths.front,
+        back_path: paths.back,
+        supporting_path: paths.supporting
+      });
+      if (photoInsert.error) throw photoInsert.error;
+
+      var photosForPdf = { front: frontPhotoData, back: backPhotoData, supporting: supportingPhotoData };
+      var doc = await buildApplicationPdf(payload, currentApplicant.application_id, photosForPdf, null, { audience: 'seller' });
+      if (sellerPdfUrl) URL.revokeObjectURL(sellerPdfUrl);
+      sellerPdfUrl = URL.createObjectURL(doc.output('blob'));
+
+      document.getElementById('confirmModal').classList.remove('is-active');
+      document.getElementById('successModal').classList.add('is-active');
+    } catch (err) {
+      console.error('finalizeSubmission failed', err);
+      if (err && err.code === '23505') {
+        confirmErr.textContent = 'Umeshawahi kutuma fomu hii kabla. Wasiliana na admin kama unahitaji kuirekebisha.';
+      } else {
+        confirmErr.textContent = 'Kuna hitilafu. Angalia intaneti yako na jaribu tena.';
+      }
+    } finally {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = 'Dhibitisha';
+    }
+  }
+
+  function openSellerPdfViewer(){
+    if (!sellerPdfUrl) return;
+    document.getElementById('sellerPdfFrame').src = sellerPdfUrl;
+    document.getElementById('sellerPdfModal').classList.add('is-active');
+  }
+
+  function closeSellerPdfViewer(){ document.getElementById('sellerPdfModal').classList.remove('is-active'); }
+
+  function closeSuccessModal(){
+    document.getElementById('successModal').classList.remove('is-active');
+    sellForm.reset();
+    frontPhotoData = null;
+    backPhotoData = null;
+    supportingPhotoData = null;
+    document.getElementById('photoFrontSlot').classList.remove('has-photo');
+    document.getElementById('photoBackSlot').classList.remove('has-photo');
+    document.getElementById('photoFrontPreview').src = '';
+    document.getElementById('photoBackPreview').src = '';
+    document.getElementById('photoSupportingSlot').classList.remove('has-photo');
+    document.getElementById('photoSupportingPreview').src = '';
+    closeSellerPdfViewer();
+    if (sellerPdfUrl) { URL.revokeObjectURL(sellerPdfUrl); sellerPdfUrl = null; }
+    showView('siteView');
+  }
+
+  /* ===================== ADMIN LOGIN ===================== */
+  async function isSimuPesaAdmin(userId){
+    if (!supabaseClient || !userId) return false;
+    var result = await supabaseClient.from('admin_profiles').select('id').eq('id', userId).maybeSingle();
+    if (result.error) throw result.error;
+    return Boolean(result.data);
+  }
+
+  async function openAdminPortal(){
+    if (!supabaseClient) { showView('adminLoginView'); return; }
+    try {
+      var sessionResult = await supabaseClient.auth.getSession();
+      var user = sessionResult.data.session && sessionResult.data.session.user;
+      if (user && await isSimuPesaAdmin(user.id)) {
+        window.location.hash = 'admin';
+        showView('adminDashboardView');
+      } else {
+        window.location.hash = 'admin';
+        showView('adminLoginView');
+      }
+    } catch (error) {
+      console.warn('Admin portal check failed:', error);
+      showView('adminLoginView');
+    }
+  }
+
+  document.getElementById('adminLoginForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var email = document.getElementById('adminEmail').value.trim().toLowerCase();
+    var pass = document.getElementById('adminPassword').value;
+    var errEl = document.getElementById('adminLoginError');
+    var submitBtn = this.querySelector('button[type="submit"]');
+
+    if (!supabaseClient) {
+      errEl.textContent = 'Muunganisho wa Supabase haujapatikana. Angalia intaneti, kisha jaribu tena.';
+      return;
+    }
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Inaingia...';
+    try {
+      var authResult = await supabaseClient.auth.signInWithPassword({ email: email, password: pass });
+      if (authResult.error) throw authResult.error;
+      if (!await isSimuPesaAdmin(authResult.data.user.id)) {
+        await supabaseClient.auth.signOut();
+        errEl.textContent = 'Akaunti hii haina ruhusa ya SimuPesa Admin.';
+        return;
+      }
+      errEl.textContent = '';
+      document.getElementById('adminLoginForm').reset();
+      window.location.hash = 'admin';
+      showView('adminDashboardView');
+    } catch (error) {
+      console.error('Admin sign-in error:', error);
+      errEl.textContent = error.message === 'Invalid login credentials' ? 'Email au password si sahihi.' : 'Imeshindikana kuingia. Jaribu tena.';
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Ingia';
+    }
+  });
+
+  async function adminLogout(){
+    if (supabaseClient) await supabaseClient.auth.signOut();
+    history.replaceState(null, '', window.location.pathname + window.location.search);
+    showView('siteView');
+  }
+
+  /* ===================== ADMIN: REGISTER SELLER ===================== */
+  /* The passkey is generated AND hashed server-side inside the
+     admin_register_seller RPC — it comes back in plaintext exactly
+     once, for the admin to hand to the seller, and is never stored
+     anywhere in plaintext. */
+  document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    var first = document.getElementById('r_first').value.trim();
+    var middle = document.getElementById('r_middle').value.trim();
+    var last = document.getElementById('r_last').value.trim();
+    var phone = document.getElementById('r_phone').value.trim();
+    var errEl = document.getElementById('registerError');
+    errEl.textContent = '';
+
+    if (!first || !last || !phone) {
+      errEl.textContent = 'Jaza jina la kwanza, la mwisho na namba ya simu.';
+      return;
+    }
+
+    var fullName = [first, middle, last].filter(Boolean).join(' ');
+    var submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+
+    try {
+      var rpcResult = await supabaseClient.rpc('admin_register_seller', { p_full_name: fullName, p_phone: phone });
+      if (rpcResult.error) throw rpcResult.error;
+      var result = Array.isArray(rpcResult.data) ? rpcResult.data[0] : rpcResult.data;
+
+      document.getElementById('registerForm').reset();
+      document.getElementById('passkeyCode').textContent = result.passkey;
+      document.getElementById('passkeyDisplay').classList.add('is-active');
+      await renderAdminTables();
+    } catch (error) {
+      console.error('register seller failed', error);
+      var msg = (error && error.message) || '';
+      errEl.textContent = msg.indexOf('PHONE_ALREADY_REGISTERED') !== -1
+        ? 'Namba hii tayari imesajiliwa kwa muuzaji mwingine.'
+        : 'Imeshindikana kusajili muuzaji. Jaribu tena.';
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+
+  function copyPasskey(){
+    var code = document.getElementById('passkeyCode').textContent.trim();
+    if (!code) return;
+    var button = document.getElementById('copyPasskeyBtn');
+    function done(){
+      button.textContent = 'Imenakiliwa ✓';
+      setTimeout(function(){ button.textContent = 'Nakili passkey'; }, 1800);
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(code).then(done).catch(function(){ window.prompt('Nakili passkey hii:', code); });
+    } else {
+      window.prompt('Nakili passkey hii:', code);
+    }
+  }
+
+  var respondingApplicationId = null;   // human-facing ID, for display
+  var respondingApplicationPk = null;   // applications.id (uuid)
+  var selectedResponseStatus = null;
+
+  function openAdminResponse(applicationId){
+    var overview = adminOverviewCache.find(function(item){ return item.application_id === applicationId; });
+    if (!overview || !overview.application_id_pk) return;
+    respondingApplicationId = applicationId;
+    respondingApplicationPk = overview.application_id_pk;
+    document.getElementById('adminResponseApplicant').textContent = overview.full_name + ' · ' + applicationId;
+    document.getElementById('adminResponseModal').classList.add('is-active');
+    resetResponseModal();
+  }
+
+  function closeAdminResponse(){
+    document.getElementById('adminResponseModal').classList.remove('is-active');
+    respondingApplicationId = null;
+    respondingApplicationPk = null;
+    selectedResponseStatus = null;
+  }
+
+  function resetResponseModal(){
+    selectedResponseStatus = null;
+    document.getElementById('responseChoices').style.display = 'flex';
+    document.getElementById('adminResponseForm').style.display = 'none';
+    document.getElementById('responseCloseRow').style.display = 'flex';
+    document.getElementById('adminResponseError').textContent = '';
+    document.getElementById('adminResponseForm').reset();
+  }
+
+  function chooseResponse(status){
+    selectedResponseStatus = status;
+    document.getElementById('responseChoices').style.display = 'none';
+    document.getElementById('adminResponseForm').style.display = 'block';
+    document.getElementById('responseCloseRow').style.display = 'none';
+    document.getElementById('responseReasonLabel').textContent = status === 'approved' ? 'Sababu ya kukubaliwa *' : 'Sababu ya kukataliwa *';
+    document.getElementById('agreedPriceField').style.display = status === 'approved' ? 'block' : 'none';
+    document.getElementById('responseAgreedPrice').required = status === 'approved';
+  }
+
+  document.getElementById('adminResponseForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    if (!respondingApplicationPk || !selectedResponseStatus) return;
+    var submitBtn = this.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      var reason = document.getElementById('responseReason').value.trim();
+      var price = selectedResponseStatus === 'approved'
+        ? Number(document.getElementById('responseAgreedPrice').value.trim())
+        : null;
+      var rpcResult = await supabaseClient.rpc('admin_respond_to_application', {
+        p_application_id: respondingApplicationPk,
+        p_status: selectedResponseStatus,
+        p_reason: reason,
+        p_agreed_price: price
+      });
+      if (rpcResult.error) throw rpcResult.error;
+      closeAdminResponse();
+      await renderAdminTables();
+    } catch (error) {
+      console.error('admin response failed', error);
+      document.getElementById('adminResponseError').textContent = 'Imeshindikana kutuma majibu. Jaribu tena.';
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
+
+  /* ===================== ADMIN: TABLES ===================== */
+  var adminTableSort = { applicants: { key: '', direction: 'asc' }, printed: { key: '', direction: 'asc' } };
+
+  function updateAdminStats(applicants, completed){
+    var successful = applicants.filter(function(a){ return a.login_status === 'success'; }).length;
+    document.getElementById('statApplicants').textContent = applicants.length;
+    document.getElementById('statCompleted').textContent = completed.length;
+    document.getElementById('statPending').textContent = applicants.filter(function(a){ return a.login_status === 'pending'; }).length;
+    document.getElementById('statLoginRate').textContent = applicants.length ? Math.round((successful / applicants.length) * 100) + '%' : '0%';
+  }
+
+  function getSortedRows(which, rows){
+    var state = adminTableSort[which];
+    if (!state.key) return rows;
+    return rows.slice().sort(function(a, b){
+      var left = String(a[state.key] || '').toLocaleLowerCase();
+      var right = String(b[state.key] || '').toLocaleLowerCase();
+      return (left < right ? -1 : left > right ? 1 : 0) * (state.direction === 'asc' ? 1 : -1);
+    });
+  }
+
+  function updateSortCarets(which){
+    var state = adminTableSort[which];
+    document.querySelectorAll('#' + which + 'Table .sort-caret').forEach(function(caret){ caret.className = 'sort-caret'; });
+    if (!state.key) return;
+    var headers = document.querySelectorAll('#' + which + 'Table th');
+    headers.forEach(function(header){
+      if (header.getAttribute('onclick') && header.getAttribute('onclick').indexOf("'" + state.key + "'") !== -1) {
+        header.querySelector('.sort-caret').classList.add(state.direction);
+      }
+    });
+  }
+
+  function filterAdminTable(which){
+    var input = document.getElementById(which + 'Search');
+    var query = input ? input.value.trim().toLocaleLowerCase() : '';
+    var rows = document.querySelectorAll('#' + which + 'Tbody tr');
+    var visible = 0;
+    rows.forEach(function(row){
+      var match = !query || row.textContent.toLocaleLowerCase().indexOf(query) !== -1;
+      row.style.display = match ? '' : 'none';
+      if (match) visible++;
+    });
+    var empty = document.getElementById(which + 'Empty');
+    if (!rows.length) {
+      empty.textContent = empty.dataset.defaultMessage;
+    } else if (!visible) {
+      empty.textContent = 'Hakuna rekodi inayolingana na utafutaji wako.';
+      empty.style.display = 'block';
+    } else {
+      empty.style.display = 'none';
+    }
+  }
+
+  function sortAdminTable(which, key){
+    var state = adminTableSort[which];
+    state.direction = state.key === key && state.direction === 'asc' ? 'desc' : 'asc';
+    state.key = key;
+    renderAdminTables();
+  }
+
+  function exportAdminTable(which){
+    var rows = which === 'applicants' ? adminOverviewCache : adminOverviewCache.filter(function(r){ return r.application_id_pk; });
+    var headers = which === 'applicants'
+      ? ['ID ya Maombi', 'Jina Kamili', 'Namba ya Simu', 'Status', 'Majibu']
+      : ['ID ya Maombi', 'Jina Kamili', 'Namba ya Simu', 'Tarehe ya Kutuma'];
+    var values = rows.map(function(row){
+      return which === 'applicants'
+        ? [row.application_id, row.full_name, row.phone, row.login_status, row.response_status ? (row.response_status === 'approved' ? 'Imekubaliwa' : 'Imekataliwa') : 'Hajajibiwa']
+        : [row.application_id, row.full_name, row.phone, row.submitted_at];
+    });
+    var csv = [headers].concat(values).map(function(row){ return row.map(function(cell){ return '"' + String(cell || '').replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+    link.download = 'simupesa-' + which + '.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
+
+  /* Irreversible bulk delete against the live database (there is no
+     more browser-only demo data to "reset" — Supabase is the only
+     source of truth). Kept behind a typed confirmation phrase since
+     it can no longer be undone by a page refresh. */
+  async function clearAdminData(){
+    var typed = window.prompt('Hii itafuta WATEJA WOTE na fomu zote KWENYE DATABASE (si kwenye kivinjari tu) na haiwezi kurejeshwa.\nAndika FUTA YOTE kuthibitisha:');
+    if (typed !== 'FUTA YOTE') return;
+    var result = await supabaseClient.from('sellers').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (result.error) { console.error('clearAdminData failed', result.error); window.alert('Imeshindikana kufuta.'); return; }
+    document.getElementById('applicantsSearch').value = '';
+    document.getElementById('printedSearch').value = '';
+    await renderAdminTables();
+  }
+
+  async function deleteSellerApplication(applicationId){
+    var overview = adminOverviewCache.find(function(item){ return item.application_id === applicationId; });
+    if (!overview) return;
+    if (!window.confirm('Unataka kufuta maombi ya ' + overview.full_name + ' (' + applicationId + ')? Hatua hii haiwezi kurejeshwa.')) return;
+    var result = await supabaseClient.from('sellers').delete().eq('id', overview.seller_id);
+    if (result.error) { console.error('delete seller failed', result.error); window.alert('Imeshindikana kufuta.'); return; }
+    await renderAdminTables();
+  }
+
+  function toggleAdminSection(which){
+    var appSec = document.getElementById('applicantsSection');
+    var prnSec = document.getElementById('printedSection');
+    var appBtn = document.getElementById('toggleApplicants');
+    var prnBtn = document.getElementById('togglePrinted');
+    if (which === 'applicants') {
+      appSec.classList.add('is-active'); prnSec.classList.remove('is-active');
+      appBtn.classList.add('is-active'); prnBtn.classList.remove('is-active');
+    } else {
+      prnSec.classList.add('is-active'); appSec.classList.remove('is-active');
+      prnBtn.classList.add('is-active'); appBtn.classList.remove('is-active');
+    }
+  }
+
+  async function renderAdminTables(){
+    var overview = await fetchSellerOverview();
+    adminOverviewCache = overview;
+    var completed = overview.filter(function(r){ return r.application_id_pk; });
+    updateAdminStats(overview, completed);
+
+    var tbody = document.getElementById('applicantsTbody');
+    var emptyNote = document.getElementById('applicantsEmpty');
+    tbody.innerHTML = '';
+    if (overview.length === 0) {
+      emptyNote.style.display = 'block';
+    } else {
+      emptyNote.style.display = 'none';
+      getSortedRows('applicants', overview).forEach(function (a) {
+        var tr = document.createElement('tr');
+        var statusHtml = a.login_status === 'success'
+          ? '<span class="status-cell"><span class="status-icon ok" title="Ameingia">&#10003;</span><span class="status-text">Ameingia</span></span>'
+          : (a.login_status === 'failed'
+            ? '<span class="status-cell"><span class="status-icon no" title="Jaribio limekataa">&#10007;</span><span class="status-text">Haikufaulu</span></span>'
+            : '<span class="status-cell"><span class="status-icon no" style="background:rgba(98,106,124,0.12);color:var(--muted);" title="Bado hajaingia">&#8212;</span><span class="status-text">Anasubiri</span></span>');
+        var applicationId = a.application_id || '—';
+        var responseHtml = !a.response_status
+          ? '<button class="response-button" type="button" onclick="openAdminResponse(\'' + escapeHtml(applicationId) + '\')" ' + (a.application_id_pk ? '' : 'disabled') + '>Hajajibiwa</button>'
+          : (a.response_status === 'approved'
+            ? '<button class="response-button response-approved" type="button" onclick="openAdminResponse(\'' + escapeHtml(applicationId) + '\')">Imekubaliwa</button>'
+            : '<button class="response-button response-rejected" type="button" onclick="openAdminResponse(\'' + escapeHtml(applicationId) + '\')">Imekataliwa</button>');
+        tr.innerHTML = '<td><span class="application-id">' + escapeHtml(applicationId) + '</span></td><td><button class="table-link" type="button" onclick="showApplicationDetails(\'' + escapeHtml(applicationId) + '\')">' + escapeHtml(a.full_name) + '</button></td><td>' + escapeHtml(a.phone) +
+          '</td><td class="muted">—</td><td>' + statusHtml + '</td><td>' + responseHtml + '</td><td><button class="delete-application" type="button" onclick="deleteSellerApplication(\'' + escapeHtml(applicationId) + '\')">Futa</button></td>';
+        tbody.appendChild(tr);
+      });
+    }
+
+    var ptbody = document.getElementById('printedTbody');
+    var pEmpty = document.getElementById('printedEmpty');
+    ptbody.innerHTML = '';
+    if (completed.length === 0) {
+      pEmpty.style.display = 'block';
+    } else {
+      pEmpty.style.display = 'none';
+      getSortedRows('printed', completed).forEach(function (c) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td><span class="application-id">' + escapeHtml(c.application_id || '—') + '</span></td><td><button class="table-link" type="button" onclick="showApplicationDetails(\'' + escapeHtml(c.application_id || '') + '\')">' + escapeHtml(c.full_name) + '</button></td><td>' + escapeHtml(c.phone) + '</td><td>' + escapeHtml(fmtDate(c.submitted_at)) + '</td>';
+        ptbody.appendChild(tr);
+      });
+    }
+    updateSortCarets('applicants');
+    updateSortCarets('printed');
+    filterAdminTable('applicants');
+    filterAdminTable('printed');
+  }
+
+  function detailRow(container, label, value){
+    var row = document.createElement('div');
+    row.className = 'detail-row';
+    var labelEl = document.createElement('strong');
+    labelEl.textContent = label;
+    var valueEl = document.createElement('span');
+    valueEl.textContent = value || '—';
+    row.appendChild(labelEl);
+    row.appendChild(valueEl);
+    container.appendChild(row);
+  }
+
+  function detailSection(container, title, rows){
+    var heading = document.createElement('h4');
+    heading.className = 'detail-section-title';
+    heading.textContent = title;
+    container.appendChild(heading);
+    rows.forEach(function(row){ detailRow(container, row[0], row[1]); });
+  }
+
+  var selectedApplication = null; // { row, humanId, photos (signed URLs), response }
+
+  async function showApplicationDetails(applicationId){
+    var modal = document.getElementById('applicationDetailsModal');
+    var body = document.getElementById('applicationDetailsBody');
+    var subtitle = document.getElementById('applicationDetailsSubtitle');
+    body.innerHTML = '';
+    document.getElementById('applicationDetailsTitle').textContent = 'Inapakia...';
+    document.getElementById('inspectorPdfBtn').disabled = true;
+    document.getElementById('adminPdfBtn').disabled = true;
+    modal.classList.add('is-active');
+
+    var full = await fetchFullApplication(applicationId);
+    var app = full && full.applications;
+
+    if (!app) {
+      selectedApplication = null;
+      document.getElementById('applicationDetailsTitle').textContent = 'Maombi hayajakamilika';
+      subtitle.textContent = 'ID: ' + (applicationId || 'Haijapatikana');
+      detailRow(body, 'Hali', 'Muuzaji bado hajakamilisha na kutuma fomu hii.');
+      return;
+    }
+
+    var photosRow = app.application_photos;
+    var response = app.application_responses;
+    var photos = {
+      front: photosRow ? await signedPhotoUrl(photosRow.front_path) : null,
+      back: photosRow ? await signedPhotoUrl(photosRow.back_path) : null,
+      supporting: photosRow && photosRow.supporting_path ? await signedPhotoUrl(photosRow.supporting_path) : null
+    };
+
+    selectedApplication = { row: app, humanId: applicationId, photos: photos, response: response };
+    document.getElementById('inspectorPdfBtn').disabled = false;
+    document.getElementById('adminPdfBtn').disabled = false;
+
+    document.getElementById('applicationDetailsTitle').textContent = app.a_full_name;
+    subtitle.textContent = 'ID ya Maombi: ' + applicationId + ' · Imetumwa: ' + fmtDate(app.submitted_at);
+    detailSection(body, 'A. Taarifa za Muuzaji', [['Namba ya simu', app.a_phone], ['NIDA', app.a_nida], ['Eneo anapoishi', app.a_location], ['Tarehe ya kuuza', app.a_sale_date], ['Sababu ya kuuza', app.a_reason]]);
+    detailSection(body, 'B. Utambulisho wa Simu', [['Brand', app.b_brand], ['Model', app.b_model], ['Model Number', app.b_model_number], ['IMEI 1', app.b_imei1], ['IMEI 2', app.b_imei2], ['Serial Number', app.b_serial], ['Storage', app.b_storage], ['Network', app.b_network], ['Dual SIM', app.b_dual_sim]]);
+    detailSection(body, 'C. Hali ya Nje', [['Screen', app.c_screen], ['Touch', app.c_touch], ['Frame/Body', app.c_frame], ['Back Cover', app.c_backcover], ['Camera Glass', app.c_camera_glass], ['Camera Lens', app.c_camera_lens], ['Buttons', app.c_buttons], ['Charging Port', app.c_charging_port], ['SIM Tray', app.c_sim_tray], ['Speaker', app.c_speaker], ['Microphone', app.c_microphone]]);
+    detailSection(body, 'D. Battery', [['Battery Health', app.d_battery_health != null ? app.d_battery_health + '%' : ''], ['Imebadilishwa', app.d_replaced], ['Inachaji vizuri', app.d_charges_ok], ['Inapata joto', app.d_overheats], ['Inashuka haraka', app.d_drains_fast]]);
+    detailSection(body, 'F. Camera', [['Front Camera', app.f_front], ['Main Camera', app.f_main], ['Ultrawide', app.f_ultrawide], ['Telephoto', app.f_telephoto], ['Flash', app.f_flash], ['Video Recording', app.f_video], ['Camera Focus', app.f_focus]]);
+    detailSection(body, 'G. Mfumo & Security', [['Inawaka vizuri', app.g_powers_on], ['Fingerprint', app.g_fingerprint], ['Face ID/Face Unlock', app.g_face_id], ['Wi-Fi', app.g_wifi], ['Bluetooth', app.g_bluetooth], ['GPS', app.g_gps], ['Mobile Network', app.g_mobile_network], ['Calls', app.g_calls], ['SMS', app.g_sms], ['Internet/Data', app.g_internet]]);
+    detailSection(body, 'H. Historia ya Simu', [['Imefunguliwa', app.h_opened], ['Imetengenezwa', app.h_repaired], ['Screen ilibadilishwa', app.h_screen_changed], ['Battery ilibadilishwa', app.h_battery_changed], ['Imeanguka sana', app.h_dropped_hard], ['Imeingia maji', app.h_water_damage], ['Spare parts', app.h_spare_parts]]);
+    detailSection(body, 'I–K. Vifaa, Bei & Uthibitisho', [['Receipt', app.i_has_receipt ? 'Ndiyo' : 'Hapana'], ['Warranty Card', app.i_has_warranty ? 'Ndiyo' : 'Hapana'], ['Purchase Invoice', app.i_has_invoice ? 'Ndiyo' : 'Hapana'], ['Other', app.i_other], ['Picha ya warranty/receipt', photos.supporting ? 'Imeambatanishwa' : 'Haijaambatanishwa'], ['Bei anayotaka', fmtMoney(app.k_asking_price)], ['Sahihi ya muuzaji', app.conf_signature], ['Tarehe ya uthibitisho', app.conf_date]]);
+  }
+
+  function closeApplicationDetails(){ document.getElementById('applicationDetailsModal').classList.remove('is-active'); }
+
+  async function downloadInspectorPdf(){
+    if (!selectedApplication) return;
+    var photosForPdf = {
+      front: await urlToDataUrl(selectedApplication.photos.front),
+      back: await urlToDataUrl(selectedApplication.photos.back),
+      supporting: await urlToDataUrl(selectedApplication.photos.supporting)
+    };
+    var doc = await buildApplicationPdf(selectedApplication.row, selectedApplication.humanId, photosForPdf, selectedApplication.response, { audience: 'inspector' });
+    doc.save('SimuPesa-' + selectedApplication.humanId + '-Mkaguzi.pdf');
+  }
+
+  async function downloadAdminPdf(){
+    if (!selectedApplication) return;
+    var photosForPdf = {
+      front: await urlToDataUrl(selectedApplication.photos.front),
+      back: await urlToDataUrl(selectedApplication.photos.back),
+      supporting: await urlToDataUrl(selectedApplication.photos.supporting)
+    };
+    var doc = await buildApplicationPdf(selectedApplication.row, selectedApplication.humanId, photosForPdf, selectedApplication.response, { audience: 'admin' });
+    doc.save('SimuPesa-' + selectedApplication.humanId + '.pdf');
+  }
+
+  /* ===================== INITIAL ROUTE ===================== */
+  (async function routeAdmin(){
+    if (window.location.hash !== '#admin') return;
+    if (!supabaseClient) { showView('adminLoginView'); return; }
+    try {
+      var sessionResult = await supabaseClient.auth.getSession();
+      var user = sessionResult.data.session && sessionResult.data.session.user;
+      if (user && await isSimuPesaAdmin(user.id)) showView('adminDashboardView');
+      else showView('adminLoginView');
+    } catch (error) {
+      console.warn('Admin session check failed:', error);
+      showView('adminLoginView');
+    }
+  })();
 </script>
 </body>
 </html>
